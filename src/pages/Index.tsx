@@ -46,7 +46,6 @@ export default function Index() {
   const selectedMonthKey = isSingleMonth ? getMonthKey(dateRange.from) : currentMonthKey;
   const superMetaActive = isSingleMonth ? (superMeta[selectedMonthKey] || false) : false;
 
-  // Presentations for the period
   const periodPresentations = useMemo(() => {
     let total = 0;
     const startMonth = dateRange.from.getFullYear() * 12 + dateRange.from.getMonth();
@@ -64,7 +63,6 @@ export default function Index() {
     ? (presentations[getMonthKey(dateRange.from)] || 0)
     : (presentations[currentMonthKey] || 0);
 
-  // KPIs: commissions EARNED in this period (paid next month)
   const kpis = useMemo(() => {
     let projected = 0;
     let paid = 0;
@@ -79,10 +77,8 @@ export default function Index() {
     return { salary: settings.fixedSalary, projected, paid, total: settings.fixedSalary + paid, presentations: periodPresentations };
   }, [filteredDeals, presentations, settings, periodPresentations, superMeta]);
 
-  // Payable commissions: deals from PREVIOUS month(s) whose commission is payable in the selected period
   const payableData = useMemo(() => {
     if (!isSingleMonth) return { deals: [], total: 0, paidTotal: 0 };
-    // Deals whose payable month = selected month
     const payable = deals.filter((d) => {
       const payMonth = getPayableMonthKey(d.closingDate);
       return payMonth === selectedMonthKey;
@@ -115,7 +111,6 @@ export default function Index() {
   };
 
   const handleDownloadReport = () => {
-    // Get previous month deals for payable section
     const prevMonth = new Date(dateRange.from);
     prevMonth.setMonth(prevMonth.getMonth() - 1);
     const prevMonthKey = getMonthKey(prevMonth);
@@ -153,37 +148,38 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-30">
+      {/* Header */}
+      <header className="border-b border-border/60 bg-card/80 backdrop-blur-sm sticky top-0 z-30">
         <div className="container flex items-center justify-between h-14">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <DollarSign className="h-4 w-4 text-primary-foreground" />
+          <div className="flex items-center gap-2.5">
+            <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
+              <DollarSign className="h-3.5 w-3.5 text-primary-foreground" />
             </div>
-            <h1 className="font-bold text-lg tracking-tight">Comissões</h1>
+            <h1 className="font-bold text-base tracking-tight">Comissões</h1>
           </div>
         </div>
       </header>
 
-      <main className="container py-6">
+      <main className="container py-5">
         <Tabs defaultValue="dashboard">
-          <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-col gap-3 mb-5">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <TabsList>
-                <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-                <TabsTrigger value="settings">Parâmetros</TabsTrigger>
+              <TabsList className="h-9">
+                <TabsTrigger value="dashboard" className="text-xs">Dashboard</TabsTrigger>
+                <TabsTrigger value="settings" className="text-xs">Parâmetros</TabsTrigger>
               </TabsList>
 
               <div className="flex items-center gap-2">
-                <Button onClick={handleNewDeal} size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
+                <Button onClick={handleNewDeal} size="sm" className="h-8 text-xs">
+                  <Plus className="h-3.5 w-3.5 mr-1" />
                   Novo Fechamento
                 </Button>
-                <Button onClick={handleDownloadReport} size="sm" variant="outline">
-                  <FileDown className="h-4 w-4 mr-1" />
-                  Relatório PDF
+                <Button onClick={handleDownloadReport} size="sm" variant="outline" className="h-8 text-xs">
+                  <FileDown className="h-3.5 w-3.5 mr-1" />
+                  PDF
                 </Button>
-                <Button onClick={handlePrintReport} size="sm" variant="ghost">
-                  <Printer className="h-4 w-4" />
+                <Button onClick={handlePrintReport} size="sm" variant="ghost" className="h-8 w-8 p-0">
+                  <Printer className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>
@@ -191,71 +187,77 @@ export default function Index() {
             <PeriodFilter onPeriodChange={handlePeriodChange} />
           </div>
 
-          <TabsContent value="dashboard" className="space-y-6 mt-0">
-            {/* Period label + Super Meta toggle */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h2 className="text-lg font-semibold text-muted-foreground">{periodLabel}</h2>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground">{filteredDeals.length} fechamento(s)</span>
+          <TabsContent value="dashboard" className="space-y-5 mt-0">
+            {/* Period header with Super Meta */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="text-sm font-semibold text-foreground">{periodLabel}</h2>
+                <span className="text-xs text-muted-foreground">{filteredDeals.length} fechamento(s)</span>
+              </div>
+              {isSingleMonth && (
+                <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-warning/10 border border-warning/20">
+                  <Zap className="h-3.5 w-3.5 text-warning" />
+                  <Label htmlFor="super-meta" className="text-[11px] font-medium text-warning cursor-pointer">Super Meta</Label>
+                  <Switch
+                    id="super-meta"
+                    checked={superMetaActive}
+                    onCheckedChange={(checked) => toggleSuperMeta(selectedMonthKey, checked)}
+                    className="scale-[0.65]"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* KPI Row: 5 financial cards + presentations input inline */}
+            <div>
+              <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold">Comissões geradas no período</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <KpiCard title="Salário Fixo" value={formatCurrency(kpis.salary)} icon={Wallet} />
+                <KpiCard title="Projetada" value={formatCurrency(kpis.projected)} icon={TrendingUp} variant="primary" />
+                <KpiCard title="Paga" value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" />
+                <KpiCard title="Total Período" value={formatCurrency(kpis.total)} icon={DollarSign} variant="warning" />
+                {isSingleMonth ? (
+                  <PresentationsCard
+                    count={presentations[getMonthKey(dateRange.from)] || 0}
+                    onChange={(c) => updatePresentations(getMonthKey(dateRange.from), c)}
+                  />
+                ) : (
+                  <KpiCard
+                    title="Apresentações"
+                    value={kpis.presentations.toString()}
+                    icon={CalendarDays}
+                    trend="Soma do período"
+                  />
+                )}
                 {isSingleMonth && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                    <Zap className="h-4 w-4 text-yellow-500" />
-                    <Label htmlFor="super-meta" className="text-xs font-medium text-yellow-500 cursor-pointer">Super Meta</Label>
-                    <Switch
-                      id="super-meta"
-                      checked={superMetaActive}
-                      onCheckedChange={(checked) => toggleSuperMeta(selectedMonthKey, checked)}
-                      className="scale-75"
-                    />
-                  </div>
+                  <KpiCard
+                    title="Meta"
+                    value={kpis.presentations >= 15 ? "Atingida ✓" : `Faltam ${15 - kpis.presentations}`}
+                    icon={CalendarDays}
+                    trend={`${kpis.presentations}/15 apresentações`}
+                    variant={kpis.presentations >= 15 ? "success" : "default"}
+                  />
                 )}
               </div>
             </div>
 
-            {/* KPI Cards - Earned this period */}
-            <div>
-              <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide font-medium">Comissões geradas no período</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                <KpiCard title="Salário Fixo" value={formatCurrency(kpis.salary)} icon={Wallet} />
-                <KpiCard title="Comissão Projetada" value={formatCurrency(kpis.projected)} icon={TrendingUp} variant="primary" />
-                <KpiCard title="Comissão Paga" value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" />
-                <KpiCard title="Total do Período" value={formatCurrency(kpis.total)} icon={DollarSign} variant="warning" />
-                <KpiCard
-                  title="Apresentações"
-                  value={kpis.presentations.toString()}
-                  icon={CalendarDays}
-                  trend={isSingleMonth ? (kpis.presentations >= 15 ? "Meta atingida ✓" : `Faltam ${15 - kpis.presentations}`) : "Soma do período"}
-                />
-              </div>
-            </div>
-
-            {/* Payable commissions - what is to be RECEIVED this month */}
+            {/* Payable commissions */}
             {isSingleMonth && payableData.deals.length > 0 && (
               <div>
-                <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide font-medium flex items-center gap-1">
-                  <ArrowDownToLine className="h-3.5 w-3.5" />
-                  Comissões a receber este mês (fechamentos do mês anterior)
+                <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold flex items-center gap-1">
+                  <ArrowDownToLine className="h-3 w-3" />
+                  A receber este mês (mês anterior)
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <KpiCard title="A Receber (Total)" value={formatCurrency(payableData.total)} icon={ArrowDownToLine} variant="primary" />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <KpiCard title="A Receber" value={formatCurrency(payableData.total)} icon={ArrowDownToLine} variant="primary" />
                   <KpiCard title="Já Pago" value={formatCurrency(payableData.paidTotal)} icon={BadgeDollarSign} variant="success" />
                   <KpiCard title="Pendente" value={formatCurrency(payableData.total - payableData.paidTotal)} icon={Wallet} />
                 </div>
               </div>
             )}
 
-            {/* Presentations + Chart */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {isSingleMonth && (
-                <PresentationsCard
-                  count={presentations[getMonthKey(dateRange.from)] || 0}
-                  onChange={(c) => updatePresentations(getMonthKey(dateRange.from), c)}
-                />
-              )}
-              <div className={isSingleMonth ? "lg:col-span-2" : "lg:col-span-3"}>
-                <OperationsChart deals={filteredDeals} />
-              </div>
-            </div>
+            {/* Chart - full width */}
+            <OperationsChart deals={filteredDeals} />
 
             {/* Deals Table */}
             <DealsTable

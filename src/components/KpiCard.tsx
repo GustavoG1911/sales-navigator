@@ -1,5 +1,4 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/commission";
 import { LucideIcon } from "lucide-react";
 
 interface KpiCardProps {
@@ -11,10 +10,10 @@ interface KpiCardProps {
 }
 
 const variantStyles = {
-  default: "border-border/50",
-  primary: "border-primary/30 bg-primary/5",
-  success: "border-success/30 bg-success/5",
-  warning: "border-warning/30 bg-warning/5",
+  default: "border-border/60",
+  primary: "border-primary/20 bg-primary/[0.03]",
+  success: "border-success/20 bg-success/[0.03]",
+  warning: "border-warning/20 bg-warning/[0.03]",
 };
 
 const iconStyles = {
@@ -26,11 +25,11 @@ const iconStyles = {
 
 export function KpiCard({ title, value, icon: Icon, trend, variant = "default" }: KpiCardProps) {
   return (
-    <Card className={`glass-card animate-fade-in ${variantStyles[variant]}`}>
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-muted-foreground">{title}</span>
-          <Icon className={`h-4 w-4 ${iconStyles[variant]}`} />
+    <Card className={`glass-card ${variantStyles[variant]}`}>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</span>
+          <Icon className={`h-4 w-4 ${iconStyles[variant]} opacity-60`} />
         </div>
         <p className="kpi-value">{value}</p>
         {trend && <p className="text-xs text-muted-foreground mt-1">{trend}</p>}
