@@ -54,7 +54,7 @@ export function ReceivablesFlow({
     for (let m = startMonth; m <= endMonth; m++) {
       const year = Math.floor(m / 12);
       const month = m % 12;
-      const salaryDate = new Date(year, month, 5);
+      const salaryDate = new Date(year, month, 1);
       result.push({
         id: `salary-${year}-${String(month + 1).padStart(2, "0")}`,
         type: "salary",
