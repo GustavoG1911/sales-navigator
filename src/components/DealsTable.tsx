@@ -48,6 +48,7 @@ export function DealsTable({ deals, presentations, onEdit, onDelete, onStatusCha
                   <TableHead className="text-right">Mensalidade</TableHead>
                   <TableHead className="text-right">Implantação</TableHead>
                   <TableHead className="text-right">Comissão</TableHead>
+                  <TableHead>Pgto. Implantação</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
