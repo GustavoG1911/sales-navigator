@@ -57,6 +57,7 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
       setMonthlyValue("");
       setImplantationValue("");
       setFirstPaymentDate(undefined);
+      setImplantationPaymentDate(undefined);
       setIsInstallment(false);
       setInstallmentCount("2");
       setInstallmentDates([]);
