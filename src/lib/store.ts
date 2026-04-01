@@ -1,10 +1,16 @@
-import { Deal, MonthlyPresentations, AppSettings } from "./types";
+import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings } from "./types";
 
 const DEALS_KEY = "comissao_deals";
 const PRESENTATIONS_KEY = "comissao_presentations";
 const SETTINGS_KEY = "comissao_settings";
+const SUPER_META_KEY = "comissao_super_meta";
 
-const defaultSettings: AppSettings = { fixedSalary: 3500 };
+const defaultSettings: AppSettings = {
+  fixedSalary: 3500,
+  commissionRate: 0.20,
+  superMetaThreshold: 30,
+  superMetaMultiplier: 2,
+};
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -49,4 +55,12 @@ export function getSettings(): AppSettings {
 
 export function saveSettings(settings: AppSettings) {
   save(SETTINGS_KEY, settings);
+}
+
+export function getSuperMeta(): MonthlySuperMeta {
+  return load<MonthlySuperMeta>(SUPER_META_KEY, {});
+}
+
+export function saveSuperMeta(data: MonthlySuperMeta) {
+  save(SUPER_META_KEY, data);
 }
