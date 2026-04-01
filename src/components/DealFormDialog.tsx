@@ -117,7 +117,7 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="BluePex">BluePex</SelectItem>
-                <SelectItem value="Conecta Suite">Conecta Suite</SelectItem>
+                <SelectItem value="Opus Tech">Opus Tech</SelectItem>
               </SelectContent>
             </Select>
           </div>

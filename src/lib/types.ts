@@ -1,4 +1,4 @@
-export type Operation = "BluePex" | "Conecta Suite";
+export type Operation = "BluePex" | "Opus Tech";
 
 export type PaymentStatus = "Pendente" | "Pago" | "Cancelado";
 

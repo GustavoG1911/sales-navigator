@@ -15,8 +15,8 @@ export function OperationsChart({ deals }: OperationsChartProps) {
       value: deals.filter((d) => d.operation === "BluePex").reduce((s, d) => s + d.monthlyValue + d.implantationValue, 0),
     },
     {
-      name: "Conecta Suite",
-      value: deals.filter((d) => d.operation === "Conecta Suite").reduce((s, d) => s + d.monthlyValue + d.implantationValue, 0),
+      name: "Opus Tech",
+      value: deals.filter((d) => d.operation === "Opus Tech").reduce((s, d) => s + d.monthlyValue + d.implantationValue, 0),
     },
   ];
 
