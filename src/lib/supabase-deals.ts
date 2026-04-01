@@ -1,6 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Deal } from "./types";
 
+async function getCurrentUserId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+  return user.id;
+}
 interface DbDeal {
   id: string;
   client_name: string;
