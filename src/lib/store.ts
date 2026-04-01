@@ -1,4 +1,4 @@
-import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings } from "./types";
+import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings, ReceivableAdjustments } from "./types";
 
 const DEALS_KEY = "comissao_deals";
 const PRESENTATIONS_KEY = "comissao_presentations";
