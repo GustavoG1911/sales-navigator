@@ -1,12 +1,13 @@
 import { useState, useCallback } from "react";
-import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings } from "@/lib/types";
-import { getDeals, saveDeal, deleteDeal, getPresentations, savePresentations, getSettings, saveSettings, getSuperMeta, saveSuperMeta } from "@/lib/store";
+import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings, ReceivableAdjustments, ReceivableAdjustment } from "@/lib/types";
+import { getDeals, saveDeal, deleteDeal, getPresentations, savePresentations, getSettings, saveSettings, getSuperMeta, saveSuperMeta, getAdjustments, saveAdjustments } from "@/lib/store";
 
 export function useAppData() {
   const [deals, setDeals] = useState<Deal[]>(getDeals);
   const [presentations, setPresentations] = useState<MonthlyPresentations>(getPresentations);
   const [settings, setSettings] = useState<AppSettings>(getSettings);
   const [superMeta, setSuperMeta] = useState<MonthlySuperMeta>(getSuperMeta);
+  const [adjustments, setAdjustments] = useState<ReceivableAdjustments>(getAdjustments);
 
   const refreshDeals = useCallback(() => setDeals(getDeals()), []);
 
@@ -37,5 +38,11 @@ export function useAppData() {
     setSuperMeta(updated);
   }, [superMeta]);
 
-  return { deals, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta };
+  const updateAdjustment = useCallback((entry: ReceivableAdjustment) => {
+    const updated = { ...adjustments, [entry.id]: entry };
+    saveAdjustments(updated);
+    setAdjustments(updated);
+  }, [adjustments]);
+
+  return { deals, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment };
 }
