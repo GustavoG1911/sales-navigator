@@ -133,16 +133,10 @@ export function ReceivablesFlow({
     entries.forEach((entry) => {
       const adj = adjustments[entry.id];
       const finalValue = entry.baseValue + (adj?.adjustment || 0);
+      const salaryStatus = entry.type === "salary" ? (adj?.reason === "__paid__" ? "Pago" : "Pendente") : entry.status;
       projected += finalValue;
-      if (entry.status === "Pago" || (entry.type === "salary")) {
-        if (entry.type === "salary") {
-          // Salary is always "received" for summary
-          received += finalValue;
-        } else if (entry.status === "Pago") {
-          received += finalValue;
-        } else {
-          toReceive += finalValue;
-        }
+      if (salaryStatus === "Pago") {
+        received += finalValue;
       } else {
         toReceive += finalValue;
       }
