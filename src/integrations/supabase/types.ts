@@ -14,7 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      deals: {
+        Row: {
+          client_name: string
+          closing_date: string
+          created_at: string
+          first_payment_date: string | null
+          id: string
+          implantation_payment_date: string | null
+          implantation_value: number
+          installment_count: number
+          installment_dates: Json | null
+          is_installment: boolean
+          monthly_value: number
+          operation: string
+          payment_status: string
+          updated_at: string
+        }
+        Insert: {
+          client_name: string
+          closing_date?: string
+          created_at?: string
+          first_payment_date?: string | null
+          id?: string
+          implantation_payment_date?: string | null
+          implantation_value?: number
+          installment_count?: number
+          installment_dates?: Json | null
+          is_installment?: boolean
+          monthly_value?: number
+          operation?: string
+          payment_status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_name?: string
+          closing_date?: string
+          created_at?: string
+          first_payment_date?: string | null
+          id?: string
+          implantation_payment_date?: string | null
+          implantation_value?: number
+          installment_count?: number
+          installment_dates?: Json | null
+          is_installment?: boolean
+          monthly_value?: number
+          operation?: string
+          payment_status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
