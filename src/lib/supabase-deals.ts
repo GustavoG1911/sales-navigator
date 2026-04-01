@@ -102,18 +102,19 @@ export async function deleteDealFromDb(id: string): Promise<void> {
 }
 
 export async function seedHistoricalData(): Promise<number> {
+  const userId = await getCurrentUserId();
   const seedData = [
-    { client_name: "AIZ", operation: "BluePex", monthly_value: 1160.0, implantation_value: 1500.0, closing_date: "2025-01-15", first_payment_date: "2025-02-01", payment_status: "Pago" },
-    { client_name: "Unicooper", operation: "BluePex", monthly_value: 2739.54, implantation_value: 3975.0, closing_date: "2025-01-15", first_payment_date: "2025-02-01", payment_status: "Pago" },
-    { client_name: "Kempart", operation: "BluePex", monthly_value: 1026.94, implantation_value: 0.0, closing_date: "2025-01-15", first_payment_date: "2025-02-01", payment_status: "Pago" },
-    { client_name: "Zin Foods", operation: "BluePex", monthly_value: 1169.8, implantation_value: 0.0, closing_date: "2025-05-15", first_payment_date: "2025-06-01", payment_status: "Pago" },
-    { client_name: "Zin Foods", operation: "BluePex", monthly_value: 398.75, implantation_value: 0.0, closing_date: "2025-05-15", first_payment_date: "2025-06-01", payment_status: "Pago" },
-    { client_name: "Zin Foods", operation: "BluePex", monthly_value: 63.0, implantation_value: 0.0, closing_date: "2025-05-15", first_payment_date: "2025-06-01", payment_status: "Pago" },
-    { client_name: "Gmaster", operation: "BluePex", monthly_value: 1003.11, implantation_value: 1500.0, closing_date: "2025-05-15", first_payment_date: "2025-06-01", payment_status: "Pago" },
-    { client_name: "Arteleste", operation: "BluePex", monthly_value: 1800.8, implantation_value: 750.0, closing_date: "2025-06-15", first_payment_date: "2025-07-01", payment_status: "Pago" },
-    { client_name: "Techcert", operation: "BluePex", monthly_value: 1076.4, implantation_value: 862.5, closing_date: "2025-07-15", first_payment_date: "2025-08-01", payment_status: "Pago" },
-    { client_name: "Grupo AIZ", operation: "BluePex", monthly_value: 2900.0, implantation_value: 0.0, closing_date: "2025-08-15", first_payment_date: "2025-09-01", payment_status: "Pago" },
-    { client_name: "Frooty", operation: "BluePex", monthly_value: 8000.0, implantation_value: 7350.0, closing_date: "2025-12-15", first_payment_date: "2026-01-01", payment_status: "Pago" },
+    { client_name: "AIZ", operation: "BluePex", monthly_value: 1160.0, implantation_value: 1500.0, closing_date: "2025-01-15", first_payment_date: "2025-02-01", payment_status: "Pago", user_id: userId },
+    { client_name: "Unicooper", operation: "BluePex", monthly_value: 2739.54, implantation_value: 3975.0, closing_date: "2025-01-15", first_payment_date: "2025-02-01", payment_status: "Pago", user_id: userId },
+    { client_name: "Kempart", operation: "BluePex", monthly_value: 1026.94, implantation_value: 0.0, closing_date: "2025-01-15", first_payment_date: "2025-02-01", payment_status: "Pago", user_id: userId },
+    { client_name: "Zin Foods", operation: "BluePex", monthly_value: 1169.8, implantation_value: 0.0, closing_date: "2025-05-15", first_payment_date: "2025-06-01", payment_status: "Pago", user_id: userId },
+    { client_name: "Zin Foods", operation: "BluePex", monthly_value: 398.75, implantation_value: 0.0, closing_date: "2025-05-15", first_payment_date: "2025-06-01", payment_status: "Pago", user_id: userId },
+    { client_name: "Zin Foods", operation: "BluePex", monthly_value: 63.0, implantation_value: 0.0, closing_date: "2025-05-15", first_payment_date: "2025-06-01", payment_status: "Pago", user_id: userId },
+    { client_name: "Gmaster", operation: "BluePex", monthly_value: 1003.11, implantation_value: 1500.0, closing_date: "2025-05-15", first_payment_date: "2025-06-01", payment_status: "Pago", user_id: userId },
+    { client_name: "Arteleste", operation: "BluePex", monthly_value: 1800.8, implantation_value: 750.0, closing_date: "2025-06-15", first_payment_date: "2025-07-01", payment_status: "Pago", user_id: userId },
+    { client_name: "Techcert", operation: "BluePex", monthly_value: 1076.4, implantation_value: 862.5, closing_date: "2025-07-15", first_payment_date: "2025-08-01", payment_status: "Pago", user_id: userId },
+    { client_name: "Grupo AIZ", operation: "BluePex", monthly_value: 2900.0, implantation_value: 0.0, closing_date: "2025-08-15", first_payment_date: "2025-09-01", payment_status: "Pago", user_id: userId },
+    { client_name: "Frooty", operation: "BluePex", monthly_value: 8000.0, implantation_value: 7350.0, closing_date: "2025-12-15", first_payment_date: "2026-01-01", payment_status: "Pago", user_id: userId },
   ];
 
   const { data, error } = await supabase
