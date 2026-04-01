@@ -25,8 +25,15 @@ export interface MonthlyPresentations {
   [monthKey: string]: number; // "2026-04" -> 15
 }
 
+export interface MonthlySuperMeta {
+  [monthKey: string]: boolean; // "2026-04" -> true (activated)
+}
+
 export interface AppSettings {
   fixedSalary: number;
+  commissionRate: number; // e.g. 0.20 for 20%
+  superMetaThreshold: number; // presentations needed, default 30
+  superMetaMultiplier: number; // multiplier on monthly commission, default 2 (200%)
 }
 
 export interface CommissionBreakdown {
@@ -34,5 +41,6 @@ export interface CommissionBreakdown {
   monthlyCommission: number;
   implantationBase: number;
   implantationCommission: number;
+  superMetaBonus: number;
   totalCommission: number;
 }

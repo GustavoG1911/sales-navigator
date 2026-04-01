@@ -1,22 +1,38 @@
-import { CommissionBreakdown, Deal } from "./types";
+import { CommissionBreakdown, Deal, AppSettings } from "./types";
+
+const DEFAULT_COMMISSION_RATE = 0.20;
 
 export function calculateCommission(
   deal: Deal,
-  presentations: number
+  presentations: number,
+  settings?: AppSettings,
+  superMetaActive?: boolean
 ): CommissionBreakdown {
+  const rate = settings?.commissionRate ?? DEFAULT_COMMISSION_RATE;
   const meetsTarget = presentations >= 15;
   const monthlyBase = deal.monthlyValue * (meetsTarget ? 1 : 0.7);
-  const monthlyCommission = monthlyBase * 0.2;
+  const monthlyCommission = monthlyBase * rate;
 
   const implantationBase = deal.implantationValue * 0.4;
-  const implantationCommission = implantationBase * 0.2;
+  const implantationCommission = implantationBase * rate;
+
+  // Super meta: if active and presentations >= threshold, commission on monthly doubles
+  let superMetaBonus = 0;
+  if (superMetaActive && settings) {
+    const threshold = settings.superMetaThreshold || 30;
+    if (presentations >= threshold) {
+      // Bonus = (multiplier - 1) * monthlyCommission (so total = multiplier * monthlyCommission)
+      superMetaBonus = ((settings.superMetaMultiplier || 2) - 1) * monthlyCommission;
+    }
+  }
 
   return {
     monthlyBase,
     monthlyCommission,
     implantationBase,
     implantationCommission,
-    totalCommission: monthlyCommission + implantationCommission,
+    superMetaBonus,
+    totalCommission: monthlyCommission + implantationCommission + superMetaBonus,
   };
 }
 
@@ -39,4 +55,14 @@ export function formatMonthLabel(key: string): string {
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
   ];
   return `${months[parseInt(month) - 1]} ${year}`;
+}
+
+/**
+ * Given a deal's closing month, returns the month key when its commission is payable.
+ * Commission is paid by the 20th of the NEXT month.
+ */
+export function getPayableMonthKey(closingDate: string): string {
+  const d = new Date(closingDate);
+  d.setMonth(d.getMonth() + 1);
+  return getMonthKey(d);
 }

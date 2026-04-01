@@ -1,4 +1,4 @@
-import { Deal } from "@/lib/types";
+import { Deal, AppSettings } from "@/lib/types";
 import { calculateCommission, formatCurrency } from "@/lib/commission";
 import { format } from "date-fns";
 
@@ -7,25 +7,32 @@ interface ReportData {
   presentations: number;
   salary: number;
   periodLabel: string;
+  settings: AppSettings;
+  superMetaActive: boolean;
+  payableDeals?: Deal[];
+  payablePresentations?: number;
 }
 
 export function generateReportHTML(data: ReportData): string {
-  const { deals, presentations, salary, periodLabel } = data;
+  const { deals, presentations, salary, periodLabel, settings, superMetaActive } = data;
+  const rate = ((settings.commissionRate || 0.20) * 100).toFixed(0);
   const meetsTarget = presentations >= 15;
 
   let totalProjected = 0;
   let totalPaid = 0;
   let totalMonthly = 0;
   let totalImplantation = 0;
+  let totalSuperBonus = 0;
   let bluePexVolume = 0;
   let opusTechVolume = 0;
 
   const rows = deals.map((deal) => {
-    const comm = calculateCommission(deal, presentations);
+    const comm = calculateCommission(deal, presentations, settings, superMetaActive);
     totalProjected += comm.totalCommission;
     if (deal.paymentStatus === "Pago") totalPaid += comm.totalCommission;
     totalMonthly += deal.monthlyValue;
     totalImplantation += deal.implantationValue;
+    totalSuperBonus += comm.superMetaBonus;
     const vol = deal.monthlyValue + deal.implantationValue;
     if (deal.operation === "BluePex") bluePexVolume += vol;
     else opusTechVolume += vol;
@@ -39,10 +46,55 @@ export function generateReportHTML(data: ReportData): string {
         <td class="num">${formatCurrency(deal.implantationValue)}</td>
         <td class="num">${formatCurrency(comm.monthlyCommission)}</td>
         <td class="num">${formatCurrency(comm.implantationCommission)}</td>
+        ${comm.superMetaBonus > 0 ? `<td class="num bold" style="color:#eab308">${formatCurrency(comm.superMetaBonus)}</td>` : `<td class="num">—</td>`}
         <td class="num bold">${formatCurrency(comm.totalCommission)}</td>
         <td><span class="status status-${deal.paymentStatus.toLowerCase()}">${deal.paymentStatus}</span></td>
       </tr>`;
   });
+
+  // Payable section (commissions from previous month to be paid this month)
+  let payableSection = "";
+  if (data.payableDeals && data.payableDeals.length > 0) {
+    let payableTotal = 0;
+    const payableRows = data.payableDeals.map((deal) => {
+      const pres = data.payablePresentations || 0;
+      const comm = calculateCommission(deal, pres, settings, false);
+      payableTotal += comm.totalCommission;
+      return `
+        <tr>
+          <td>${format(new Date(deal.closingDate), "dd/MM/yyyy")}</td>
+          <td>${deal.clientName}</td>
+          <td><span class="badge ${deal.operation === "BluePex" ? "badge-blue" : "badge-purple"}">${deal.operation}</span></td>
+          <td class="num bold">${formatCurrency(comm.totalCommission)}</td>
+          <td><span class="status status-${deal.paymentStatus.toLowerCase()}">${deal.paymentStatus}</span></td>
+        </tr>`;
+    });
+
+    payableSection = `
+    <div class="section" style="page-break-before: auto;">
+      <h2>Comissões a Receber Neste Mês (fechamentos do mês anterior)</h2>
+      <p style="font-size:12px;color:#64748b;margin-bottom:12px">Comissões pagas até o dia 20 deste mês, referentes a fechamentos do período anterior.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Data Fech.</th>
+            <th>Cliente</th>
+            <th>Operação</th>
+            <th class="num">Comissão</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${payableRows.join("")}
+          <tr class="totals-row">
+            <td colspan="3">TOTAL A RECEBER</td>
+            <td class="num bold">${formatCurrency(payableTotal)}</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -61,14 +113,14 @@ export function generateReportHTML(data: ReportData): string {
   .kpi.highlight { background: #0d9488; color: white; }
   .kpi.highlight .kpi-label { color: rgba(255,255,255,0.8); }
   .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-bottom: 4px; }
-  .kpi-value { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .kpi-value { font-size: 22px; font-weight: 700; font-family: 'Courier New', monospace; }
   .section { margin-bottom: 28px; }
   .section h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #334155; border-left: 3px solid #0d9488; padding-left: 10px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { background: #f1f5f9; text-align: left; padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; }
-  td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #f1f5f9; text-align: left; padding: 8px 10px; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; }
+  td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; }
   tr:hover { background: #fafbfc; }
-  .num { text-align: right; font-family: 'JetBrains Mono', monospace; }
+  .num { text-align: right; font-family: 'Courier New', monospace; }
   .bold { font-weight: 700; color: #0d9488; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
   .badge-blue { background: #dbeafe; color: #1d4ed8; }
@@ -83,9 +135,9 @@ export function generateReportHTML(data: ReportData): string {
   .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
   .summary-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
   .summary-item .label { color: #64748b; }
-  .summary-item .val { font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+  .summary-item .val { font-weight: 600; font-family: 'Courier New', monospace; }
   .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; }
-  @media print { body { padding: 20px; } .kpis { grid-template-columns: repeat(4, 1fr); } }
+  @media print { body { padding: 20px; } }
 </style>
 </head>
 <body>
@@ -97,6 +149,7 @@ export function generateReportHTML(data: ReportData): string {
     <div class="date">
       Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}<br>
       Apresentações: ${presentations} ${meetsTarget ? "(meta atingida)" : "(abaixo da meta)"}
+      ${superMetaActive ? "<br><strong style='color:#eab308'>⚡ Super Meta Ativa</strong>" : ""}
     </div>
   </div>
 
@@ -123,42 +176,26 @@ export function generateReportHTML(data: ReportData): string {
     <h2>Resumo por Operação</h2>
     <div class="summary-grid">
       <div>
-        <div class="summary-item">
-          <span class="label">BluePex — Volume</span>
-          <span class="val">${formatCurrency(bluePexVolume)}</span>
-        </div>
-        <div class="summary-item">
-          <span class="label">Opus Tech — Volume</span>
-          <span class="val">${formatCurrency(opusTechVolume)}</span>
-        </div>
+        <div class="summary-item"><span class="label">BluePex — Volume</span><span class="val">${formatCurrency(bluePexVolume)}</span></div>
+        <div class="summary-item"><span class="label">Opus Tech — Volume</span><span class="val">${formatCurrency(opusTechVolume)}</span></div>
       </div>
       <div>
-        <div class="summary-item">
-          <span class="label">Total Mensalidades</span>
-          <span class="val">${formatCurrency(totalMonthly)}</span>
-        </div>
-        <div class="summary-item">
-          <span class="label">Total Implantações</span>
-          <span class="val">${formatCurrency(totalImplantation)}</span>
-        </div>
+        <div class="summary-item"><span class="label">Total Mensalidades</span><span class="val">${formatCurrency(totalMonthly)}</span></div>
+        <div class="summary-item"><span class="label">Total Implantações</span><span class="val">${formatCurrency(totalImplantation)}</span></div>
+        ${totalSuperBonus > 0 ? `<div class="summary-item"><span class="label" style="color:#eab308">⚡ Bônus Super Meta</span><span class="val" style="color:#eab308">${formatCurrency(totalSuperBonus)}</span></div>` : ""}
       </div>
     </div>
   </div>
 
   <div class="section">
-    <h2>Detalhamento dos Fechamentos (${deals.length} negócios)</h2>
+    <h2>Fechamentos do Período (${deals.length} negócios)</h2>
     <table>
       <thead>
         <tr>
-          <th>Data</th>
-          <th>Cliente</th>
-          <th>Operação</th>
-          <th class="num">Mensalidade</th>
-          <th class="num">Implantação</th>
-          <th class="num">Com. Mens.</th>
-          <th class="num">Com. Impl.</th>
-          <th class="num">Comissão Total</th>
-          <th>Status</th>
+          <th>Data</th><th>Cliente</th><th>Operação</th>
+          <th class="num">Mensalidade</th><th class="num">Implantação</th>
+          <th class="num">Com. Mens.</th><th class="num">Com. Impl.</th>
+          <th class="num">Super Meta</th><th class="num">Comissão Total</th><th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -167,19 +204,24 @@ export function generateReportHTML(data: ReportData): string {
           <td colspan="3">TOTAIS</td>
           <td class="num">${formatCurrency(totalMonthly)}</td>
           <td class="num">${formatCurrency(totalImplantation)}</td>
-          <td class="num" colspan="2"></td>
+          <td class="num" colspan="3"></td>
           <td class="num bold">${formatCurrency(totalProjected)}</td>
           <td></td>
         </tr>
       </tbody>
     </table>
+    <p style="font-size:11px;color:#94a3b8;margin-top:8px">* Estas comissões serão pagas até o dia 20 do mês subsequente.</p>
   </div>
+
+  ${payableSection}
 
   <div class="section">
     <h2>Regras Aplicadas</h2>
     <div class="rules">
-      <p><strong>Comissão sobre Mensalidade:</strong> ${meetsTarget ? "100%" : "70%"} do valor × 20% (${presentations} apresentações — ${meetsTarget ? "≥ 15, meta atingida" : "< 15, abaixo da meta"})</p>
-      <p style="margin-top:6px"><strong>Comissão sobre Implantação:</strong> 40% do valor × 20% (independente de apresentações)</p>
+      <p><strong>Comissão sobre Mensalidade:</strong> ${meetsTarget ? "100%" : "70%"} do valor × ${rate}% (${presentations} apresentações — ${meetsTarget ? "≥ 15, meta atingida" : "< 15, abaixo da meta"})</p>
+      <p style="margin-top:6px"><strong>Comissão sobre Implantação:</strong> 40% do valor × ${rate}% (independente de apresentações)</p>
+      <p style="margin-top:6px"><strong>Pagamento:</strong> Comissões pagas até o dia 20 do mês subsequente ao fechamento</p>
+      ${superMetaActive ? `<p style="margin-top:6px;color:#eab308"><strong>⚡ Super Meta:</strong> ≥ ${settings.superMetaThreshold} apresentações → comissão mensal × ${((settings.superMetaMultiplier || 2) * 100).toFixed(0)}%</p>` : ""}
     </div>
   </div>
 
@@ -191,17 +233,17 @@ export function generateReportHTML(data: ReportData): string {
 </html>`;
 }
 
-export function downloadReport(data: ReportData) {
+export function downloadReportPDF(data: ReportData) {
   const html = generateReportHTML(data);
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `relatorio-fechamentos-${data.periodLabel.replace(/\s/g, "-").toLowerCase()}.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const win = window.open("", "_blank");
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+    // Add print-to-PDF instruction
+    setTimeout(() => {
+      win.print();
+    }, 600);
+  }
 }
 
 export function printReport(data: ReportData) {
