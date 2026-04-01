@@ -31,6 +31,7 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
   const [monthlyValue, setMonthlyValue] = useState("");
   const [implantationValue, setImplantationValue] = useState("");
   const [firstPaymentDate, setFirstPaymentDate] = useState<Date | undefined>();
+  const [implantationPaymentDate, setImplantationPaymentDate] = useState<Date | undefined>();
   const [isInstallment, setIsInstallment] = useState(false);
   const [installmentCount, setInstallmentCount] = useState("2");
   const [installmentDates, setInstallmentDates] = useState<(Date | undefined)[]>([]);
