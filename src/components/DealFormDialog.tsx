@@ -31,6 +31,7 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
   const [monthlyValue, setMonthlyValue] = useState("");
   const [implantationValue, setImplantationValue] = useState("");
   const [firstPaymentDate, setFirstPaymentDate] = useState<Date | undefined>();
+  const [implantationPaymentDate, setImplantationPaymentDate] = useState<Date | undefined>();
   const [isInstallment, setIsInstallment] = useState(false);
   const [installmentCount, setInstallmentCount] = useState("2");
   const [installmentDates, setInstallmentDates] = useState<(Date | undefined)[]>([]);
@@ -44,6 +45,7 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
       setMonthlyValue(editDeal.monthlyValue.toString());
       setImplantationValue(editDeal.implantationValue.toString());
       setFirstPaymentDate(new Date(editDeal.firstPaymentDate));
+      setImplantationPaymentDate(editDeal.implantationPaymentDate ? new Date(editDeal.implantationPaymentDate) : undefined);
       setIsInstallment(editDeal.isInstallment);
       setInstallmentCount(editDeal.installmentCount.toString());
       setInstallmentDates(editDeal.installmentDates.map((d) => new Date(d.date)));
@@ -55,6 +57,7 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
       setMonthlyValue("");
       setImplantationValue("");
       setFirstPaymentDate(undefined);
+      setImplantationPaymentDate(undefined);
       setIsInstallment(false);
       setInstallmentCount("2");
       setInstallmentDates([]);
@@ -81,6 +84,7 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
       monthlyValue: parseFloat(monthlyValue) || 0,
       implantationValue: parseFloat(implantationValue) || 0,
       firstPaymentDate: firstPaymentDate?.toISOString() || closingDate.toISOString(),
+      implantationPaymentDate: implantationPaymentDate?.toISOString() || closingDate.toISOString(),
       isInstallment,
       installmentCount: isInstallment ? parseInt(installmentCount) || 2 : 0,
       installmentDates: isInstallment
@@ -140,6 +144,12 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
           <div className="space-y-1.5">
             <Label>Data Pgto. 1ª Mensalidade</Label>
             <DatePicker date={firstPaymentDate} onSelect={setFirstPaymentDate} />
+          </div>
+
+          {/* Implantation Payment Date */}
+          <div className="space-y-1.5">
+            <Label>Data Pgto. Implantação</Label>
+            <DatePicker date={implantationPaymentDate} onSelect={setImplantationPaymentDate} />
           </div>
 
           {/* Installment */}
