@@ -30,6 +30,7 @@ export type Database = {
           operation: string
           payment_status: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           client_name: string
@@ -46,6 +47,7 @@ export type Database = {
           operation?: string
           payment_status?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           client_name?: string
@@ -62,6 +64,34 @@ export type Database = {
           operation?: string
           payment_status?: string
           updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

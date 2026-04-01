@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAppData } from "@/hooks/useAppData";
+import { useAuth } from "@/hooks/useAuth";
 import { KpiCard } from "@/components/KpiCard";
 import { PresentationsCard } from "@/components/PresentationsCard";
 import { OperationsChart } from "@/components/OperationsChart";
@@ -15,10 +16,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, Zap, ArrowDownToLine, BarChart3, Receipt } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, Zap, ArrowDownToLine, BarChart3, Receipt, LogOut } from "lucide-react";
 
 export default function Index() {
   const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment, refreshDeals } = useAppData();
+  const { signOut, user } = useAuth();
 
   const currentMonthKey = getMonthKey(new Date());
   const now = new Date();
@@ -169,6 +171,9 @@ export default function Index() {
             </Button>
             <Button onClick={handlePrintReport} size="sm" variant="ghost" className="h-8 w-8 p-0">
               <Printer className="h-3.5 w-3.5" />
+            </Button>
+            <Button onClick={signOut} size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground">
+              <LogOut className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
