@@ -3,15 +3,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Deal, PaymentStatus } from "@/lib/types";
+import { Deal, PaymentStatus, AppSettings } from "@/lib/types";
 import { calculateCommission, formatCurrency } from "@/lib/commission";
 import { Pencil, Trash2, TableIcon } from "lucide-react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 interface DealsTableProps {
   deals: Deal[];
   presentations: number;
+  settings: AppSettings;
+  superMetaActive: boolean;
   onEdit: (deal: Deal) => void;
   onDelete: (id: string) => void;
   onStatusChange: (deal: Deal, status: PaymentStatus) => void;
@@ -23,7 +24,7 @@ const statusVariant: Record<PaymentStatus, "default" | "secondary" | "destructiv
   Cancelado: "destructive",
 };
 
-export function DealsTable({ deals, presentations, onEdit, onDelete, onStatusChange }: DealsTableProps) {
+export function DealsTable({ deals, presentations, settings, superMetaActive, onEdit, onDelete, onStatusChange }: DealsTableProps) {
   return (
     <Card className="glass-card animate-fade-in">
       <CardHeader className="pb-2">
