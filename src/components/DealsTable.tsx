@@ -56,7 +56,7 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
               </TableHeader>
               <TableBody>
                 {deals.map((deal) => {
-                  const comm = calculateCommission(deal, presentations);
+                  const comm = calculateCommission(deal, presentations, settings, superMetaActive);
                   return (
                     <TableRow key={deal.id}>
                       <TableCell className="font-mono text-sm">
