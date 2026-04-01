@@ -44,3 +44,14 @@ export interface CommissionBreakdown {
   superMetaBonus: number;
   totalCommission: number;
 }
+
+export interface ReceivableAdjustment {
+  id: string; // matches receivable entry id
+  adjustment: number;
+  reason: string;
+  effectiveDate: string; // ISO date override
+}
+
+export interface ReceivableAdjustments {
+  [entryId: string]: ReceivableAdjustment;
+}

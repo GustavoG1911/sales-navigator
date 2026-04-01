@@ -1,4 +1,4 @@
-import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings } from "./types";
+import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings, ReceivableAdjustments } from "./types";
 
 const DEALS_KEY = "comissao_deals";
 const PRESENTATIONS_KEY = "comissao_presentations";
@@ -63,4 +63,14 @@ export function getSuperMeta(): MonthlySuperMeta {
 
 export function saveSuperMeta(data: MonthlySuperMeta) {
   save(SUPER_META_KEY, data);
+}
+
+const ADJUSTMENTS_KEY = "comissao_adjustments";
+
+export function getAdjustments(): ReceivableAdjustments {
+  return load<ReceivableAdjustments>(ADJUSTMENTS_KEY, {});
+}
+
+export function saveAdjustments(data: ReceivableAdjustments) {
+  save(ADJUSTMENTS_KEY, data);
 }
