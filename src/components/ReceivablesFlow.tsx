@@ -54,7 +54,7 @@ export function ReceivablesFlow({
     for (let m = startMonth; m <= endMonth; m++) {
       const year = Math.floor(m / 12);
       const month = m % 12;
-      const salaryDate = new Date(year, month, 5);
+      const salaryDate = new Date(year, month, 1);
       result.push({
         id: `salary-${year}-${String(month + 1).padStart(2, "0")}`,
         type: "salary",
@@ -133,16 +133,10 @@ export function ReceivablesFlow({
     entries.forEach((entry) => {
       const adj = adjustments[entry.id];
       const finalValue = entry.baseValue + (adj?.adjustment || 0);
+      const salaryStatus = entry.type === "salary" ? (adj?.salaryPaid ? "Pago" : "Pendente") : entry.status;
       projected += finalValue;
-      if (entry.status === "Pago" || (entry.type === "salary")) {
-        if (entry.type === "salary") {
-          // Salary is always "received" for summary
-          received += finalValue;
-        } else if (entry.status === "Pago") {
-          received += finalValue;
-        } else {
-          toReceive += finalValue;
-        }
+      if (salaryStatus === "Pago") {
+        received += finalValue;
       } else {
         toReceive += finalValue;
       }
@@ -271,7 +265,21 @@ export function ReceivablesFlow({
                   </TableCell>
                   <TableCell className="px-3 py-2 text-right">
                     {entry.type === "salary" ? (
-                      <Badge variant="outline" className="text-[10px]">Fixo</Badge>
+                      <Select
+                        value={adjustments[entry.id]?.salaryPaid ? "Pago" : "Pendente"}
+                        onValueChange={(v) => {
+                          const existing = adjustments[entry.id] || { id: entry.id, adjustment: 0, reason: "", effectiveDate: "" };
+                          onUpdateAdjustment({ ...existing, salaryPaid: v === "Pago" });
+                        }}
+                      >
+                        <SelectTrigger className="h-7 w-[90px] text-[11px] ml-auto">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Pendente">Pendente</SelectItem>
+                          <SelectItem value="Pago">Pago</SelectItem>
+                        </SelectContent>
+                      </Select>
                     ) : (
                       <Select
                         value={entry.status}
