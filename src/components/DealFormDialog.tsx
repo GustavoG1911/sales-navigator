@@ -84,6 +84,7 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
       monthlyValue: parseFloat(monthlyValue) || 0,
       implantationValue: parseFloat(implantationValue) || 0,
       firstPaymentDate: firstPaymentDate?.toISOString() || closingDate.toISOString(),
+      implantationPaymentDate: implantationPaymentDate?.toISOString() || closingDate.toISOString(),
       isInstallment,
       installmentCount: isInstallment ? parseInt(installmentCount) || 2 : 0,
       installmentDates: isInstallment
