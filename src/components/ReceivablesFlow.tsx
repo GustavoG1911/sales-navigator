@@ -266,10 +266,10 @@ export function ReceivablesFlow({
                   <TableCell className="px-3 py-2 text-right">
                     {entry.type === "salary" ? (
                       <Select
-                        value={adjustments[entry.id]?.reason === "__paid__" ? "Pago" : "Pendente"}
+                        value={adjustments[entry.id]?.salaryPaid ? "Pago" : "Pendente"}
                         onValueChange={(v) => {
                           const existing = adjustments[entry.id] || { id: entry.id, adjustment: 0, reason: "", effectiveDate: "" };
-                          onUpdateAdjustment({ ...existing, reason: v === "Pago" ? "__paid__" : "" });
+                          onUpdateAdjustment({ ...existing, salaryPaid: v === "Pago" });
                         }}
                       >
                         <SelectTrigger className="h-7 w-[90px] text-[11px] ml-auto">

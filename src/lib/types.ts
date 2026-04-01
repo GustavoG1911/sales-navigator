@@ -46,10 +46,11 @@ export interface CommissionBreakdown {
 }
 
 export interface ReceivableAdjustment {
-  id: string; // matches receivable entry id
+  id: string;
   adjustment: number;
   reason: string;
-  effectiveDate: string; // ISO date override
+  effectiveDate: string;
+  salaryPaid?: boolean;
 }
 
 export interface ReceivableAdjustments {
