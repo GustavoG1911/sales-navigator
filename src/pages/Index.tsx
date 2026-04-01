@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAppData } from "@/hooks/useAppData";
+import { useAuth } from "@/hooks/useAuth";
 import { KpiCard } from "@/components/KpiCard";
 import { PresentationsCard } from "@/components/PresentationsCard";
 import { OperationsChart } from "@/components/OperationsChart";
@@ -15,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, Zap, ArrowDownToLine, BarChart3, Receipt } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, Zap, ArrowDownToLine, BarChart3, Receipt, LogOut } from "lucide-react";
 
 export default function Index() {
   const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment, refreshDeals } = useAppData();
