@@ -64,3 +64,13 @@ export function getSuperMeta(): MonthlySuperMeta {
 export function saveSuperMeta(data: MonthlySuperMeta) {
   save(SUPER_META_KEY, data);
 }
+
+const ADJUSTMENTS_KEY = "comissao_adjustments";
+
+export function getAdjustments(): ReceivableAdjustments {
+  return load<ReceivableAdjustments>(ADJUSTMENTS_KEY, {});
+}
+
+export function saveAdjustments(data: ReceivableAdjustments) {
+  save(ADJUSTMENTS_KEY, data);
+}
