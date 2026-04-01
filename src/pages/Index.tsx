@@ -172,6 +172,9 @@ export default function Index() {
             <Button onClick={handlePrintReport} size="sm" variant="ghost" className="h-8 w-8 p-0">
               <Printer className="h-3.5 w-3.5" />
             </Button>
+            <Button onClick={signOut} size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground">
+              <LogOut className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
       </header>
