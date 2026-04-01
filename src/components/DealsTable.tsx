@@ -76,6 +76,23 @@ export function DealsTable({ deals, presentations, onEdit, onDelete, onStatusCha
                       <TableCell className="text-right font-mono font-semibold text-primary">
                         {formatCurrency(comm.totalCommission)}
                       </TableCell>
+                      <TableCell className="text-xs">
+                        {deal.isInstallment && deal.installmentDates.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {deal.installmentDates.map((d, i) => (
+                              <div key={i} className="text-muted-foreground">
+                                {i + 1}ª: {d.date ? format(new Date(d.date), "dd/MM/yy") : "—"}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="font-mono">
+                            {deal.implantationPaymentDate
+                              ? format(new Date(deal.implantationPaymentDate), "dd/MM/yy")
+                              : "—"}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Select
                           value={deal.paymentStatus}

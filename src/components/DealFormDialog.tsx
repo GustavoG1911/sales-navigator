@@ -146,6 +146,12 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
             <DatePicker date={firstPaymentDate} onSelect={setFirstPaymentDate} />
           </div>
 
+          {/* Implantation Payment Date */}
+          <div className="space-y-1.5">
+            <Label>Data Pgto. Implantação</Label>
+            <DatePicker date={implantationPaymentDate} onSelect={setImplantationPaymentDate} />
+          </div>
+
           {/* Installment */}
           <div className="flex items-center gap-3">
             <Switch checked={isInstallment} onCheckedChange={setIsInstallment} />
