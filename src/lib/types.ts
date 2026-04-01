@@ -14,6 +14,7 @@ export interface Deal {
   monthlyValue: number;
   implantationValue: number;
   firstPaymentDate: string;
+  implantationPaymentDate: string;
   isInstallment: boolean;
   installmentCount: number;
   installmentDates: InstallmentDate[];

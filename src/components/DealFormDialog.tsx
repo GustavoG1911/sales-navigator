@@ -45,6 +45,7 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
       setMonthlyValue(editDeal.monthlyValue.toString());
       setImplantationValue(editDeal.implantationValue.toString());
       setFirstPaymentDate(new Date(editDeal.firstPaymentDate));
+      setImplantationPaymentDate(editDeal.implantationPaymentDate ? new Date(editDeal.implantationPaymentDate) : undefined);
       setIsInstallment(editDeal.isInstallment);
       setInstallmentCount(editDeal.installmentCount.toString());
       setInstallmentDates(editDeal.installmentDates.map((d) => new Date(d.date)));
