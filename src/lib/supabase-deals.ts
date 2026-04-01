@@ -67,6 +67,7 @@ export async function fetchDeals(): Promise<Deal[]> {
 }
 
 export async function upsertDeal(deal: Deal): Promise<Deal> {
+  const userId = await getCurrentUserId();
   const payload = dealToDb(deal);
 
   // Check if deal already exists (UUID from DB vs generated ID)
@@ -84,7 +85,7 @@ export async function upsertDeal(deal: Deal): Promise<Deal> {
   } else {
     const { data, error } = await supabase
       .from("deals" as any)
-      .insert(payload as any)
+      .insert({ ...payload, user_id: userId } as any)
       .select()
       .single();
     if (error) throw error;
