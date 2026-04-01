@@ -293,7 +293,7 @@ export default function Index() {
           </TabsContent>
 
           <TabsContent value="settings" className="mt-0">
-            <SettingsPanel settings={settings} onSave={updateSettings} />
+            <SettingsPanel settings={settings} onSave={updateSettings} onRefreshDeals={refreshDeals} />
           </TabsContent>
         </Tabs>
       </main>
