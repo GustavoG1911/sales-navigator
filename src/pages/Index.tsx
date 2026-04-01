@@ -20,6 +20,7 @@ import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, Fi
 
 export default function Index() {
   const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment, refreshDeals } = useAppData();
+  const { signOut, user } = useAuth();
 
   const currentMonthKey = getMonthKey(new Date());
   const now = new Date();
