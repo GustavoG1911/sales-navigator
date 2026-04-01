@@ -76,6 +76,9 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                       </TableCell>
                       <TableCell className="text-right font-mono font-semibold text-primary">
                         {formatCurrency(comm.totalCommission)}
+                        {comm.superMetaBonus > 0 && (
+                          <span className="block text-xs text-yellow-500">+{formatCurrency(comm.superMetaBonus)} super</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs">
                         {deal.isInstallment && deal.installmentDates.length > 0 ? (
