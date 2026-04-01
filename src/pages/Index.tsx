@@ -6,6 +6,7 @@ import { OperationsChart } from "@/components/OperationsChart";
 import { DealsTable } from "@/components/DealsTable";
 import { DealFormDialog } from "@/components/DealFormDialog";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { ReceivablesFlow } from "@/components/ReceivablesFlow";
 import { PeriodFilter, DateRange } from "@/components/PeriodFilter";
 import { calculateCommission, formatCurrency, getMonthKey, formatMonthLabel, getPayableMonthKey } from "@/lib/commission";
 import { downloadReportPDF, printReport } from "@/lib/report";
@@ -14,10 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, Zap, ArrowDownToLine } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, Zap, ArrowDownToLine, BarChart3, Receipt } from "lucide-react";
 
 export default function Index() {
-  const { deals, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta } = useAppData();
+  const { deals, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment } = useAppData();
 
   const currentMonthKey = getMonthKey(new Date());
   const now = new Date();
@@ -155,37 +156,45 @@ export default function Index() {
             <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
               <DollarSign className="h-3.5 w-3.5 text-primary-foreground" />
             </div>
-            <h1 className="font-bold text-base tracking-tight">Comissões</h1>
+            <h1 className="font-bold text-base tracking-tight">DealFlow</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button onClick={handleNewDeal} size="sm" className="h-8 text-xs">
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Novo Fechamento
+            </Button>
+            <Button onClick={handleDownloadReport} size="sm" variant="outline" className="h-8 text-xs">
+              <FileDown className="h-3.5 w-3.5 mr-1" />
+              PDF
+            </Button>
+            <Button onClick={handlePrintReport} size="sm" variant="ghost" className="h-8 w-8 p-0">
+              <Printer className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
       </header>
 
       <main className="container py-5">
+        {/* Period filter - global */}
+        <div className="mb-4">
+          <PeriodFilter onPeriodChange={handlePeriodChange} />
+        </div>
+
+        {/* Main tabs */}
         <Tabs defaultValue="dashboard">
-          <div className="flex flex-col gap-3 mb-5">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <TabsList className="h-9">
-                <TabsTrigger value="dashboard" className="text-xs">Dashboard</TabsTrigger>
-                <TabsTrigger value="settings" className="text-xs">Parâmetros</TabsTrigger>
-              </TabsList>
-
-              <div className="flex items-center gap-2">
-                <Button onClick={handleNewDeal} size="sm" className="h-8 text-xs">
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Novo Fechamento
-                </Button>
-                <Button onClick={handleDownloadReport} size="sm" variant="outline" className="h-8 text-xs">
-                  <FileDown className="h-3.5 w-3.5 mr-1" />
-                  PDF
-                </Button>
-                <Button onClick={handlePrintReport} size="sm" variant="ghost" className="h-8 w-8 p-0">
-                  <Printer className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-
-            <PeriodFilter onPeriodChange={handlePeriodChange} />
-          </div>
+          <TabsList className="h-9 mb-5">
+            <TabsTrigger value="dashboard" className="text-xs gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Dashboard de Vendas
+            </TabsTrigger>
+            <TabsTrigger value="receivables" className="text-xs gap-1.5">
+              <Receipt className="h-3.5 w-3.5" />
+              Fluxo de Recebíveis
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="text-xs gap-1.5">
+              Parâmetros
+            </TabsTrigger>
+          </TabsList>
 
           <TabsContent value="dashboard" className="space-y-5 mt-0">
             {/* Period header with Super Meta */}
@@ -208,7 +217,7 @@ export default function Index() {
               )}
             </div>
 
-            {/* KPI Row: 5 financial cards + presentations input inline */}
+            {/* KPI Row */}
             <div>
               <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold">Comissões geradas no período</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -256,10 +265,8 @@ export default function Index() {
               </div>
             )}
 
-            {/* Chart - full width */}
             <OperationsChart deals={filteredDeals} />
 
-            {/* Deals Table */}
             <DealsTable
               deals={filteredDeals}
               presentations={commissionPresentations}
@@ -267,6 +274,20 @@ export default function Index() {
               superMetaActive={superMetaActive}
               onEdit={handleEdit}
               onDelete={removeDeal}
+              onStatusChange={handleStatusChange}
+            />
+          </TabsContent>
+
+          <TabsContent value="receivables" className="mt-0">
+            <ReceivablesFlow
+              deals={filteredDeals}
+              allDeals={deals}
+              settings={settings}
+              presentations={presentations}
+              superMeta={superMeta}
+              dateRange={dateRange}
+              adjustments={adjustments}
+              onUpdateAdjustment={updateAdjustment}
               onStatusChange={handleStatusChange}
             />
           </TabsContent>
