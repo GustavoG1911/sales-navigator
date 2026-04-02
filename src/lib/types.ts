@@ -21,28 +21,35 @@ export interface Deal {
   paymentStatus: PaymentStatus;
 }
 
+export interface OperationPresentations {
+  bluepex: number;
+  opus: number;
+}
+
 export interface MonthlyPresentations {
-  [monthKey: string]: number; // "2026-04" -> 15
+  [monthKey: string]: OperationPresentations;
 }
 
 export interface MonthlySuperMeta {
-  [monthKey: string]: boolean; // "2026-04" -> true (activated)
+  [monthKey: string]: boolean;
 }
 
 export interface AppSettings {
   fixedSalary: number;
-  commissionRate: number; // e.g. 0.20 for 20%
-  superMetaThreshold: number; // presentations needed, default 30
-  superMetaMultiplier: number; // multiplier on monthly commission, default 2 (200%)
+  commissionRate: number;
+  superMetaThreshold: number;
+  superMetaMultiplier: number;
 }
 
 export interface CommissionBreakdown {
   monthlyBase: number;
+  monthlyBaseRate: number; // 1.0 or 0.7
   monthlyCommission: number;
   implantationBase: number;
   implantationCommission: number;
   superMetaBonus: number;
   totalCommission: number;
+  commissionRate: number; // e.g. 0.20
 }
 
 export interface ReceivableAdjustment {

@@ -9,7 +9,7 @@ import { DealFormDialog } from "@/components/DealFormDialog";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { ReceivablesFlow } from "@/components/ReceivablesFlow";
 import { PeriodFilter, DateRange } from "@/components/PeriodFilter";
-import { calculateCommission, formatCurrency, getMonthKey, formatMonthLabel, getPayableMonthKey } from "@/lib/commission";
+import { calculateCommission, formatCurrency, getMonthKey, formatMonthLabel, getPresentationsForDeal } from "@/lib/commission";
 import { downloadReportPDF, printReport } from "@/lib/report";
 import { Deal, PaymentStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ export default function Index() {
     setPeriodLabel(label);
   };
 
+  // Dashboard: filter by closingDate
   const filteredDeals = useMemo(
     () => deals.filter((d) => {
       const date = new Date(d.closingDate);
@@ -49,55 +50,22 @@ export default function Index() {
   const selectedMonthKey = isSingleMonth ? getMonthKey(dateRange.from) : currentMonthKey;
   const superMetaActive = isSingleMonth ? (superMeta[selectedMonthKey] || false) : false;
 
-  const periodPresentations = useMemo(() => {
-    let total = 0;
-    const startMonth = dateRange.from.getFullYear() * 12 + dateRange.from.getMonth();
-    const endMonth = dateRange.to.getFullYear() * 12 + dateRange.to.getMonth();
-    for (let m = startMonth; m <= endMonth; m++) {
-      const year = Math.floor(m / 12);
-      const month = m % 12;
-      const key = `${year}-${String(month + 1).padStart(2, "0")}`;
-      total += presentations[key] || 0;
-    }
-    return total;
-  }, [presentations, dateRange]);
-
-  const commissionPresentations = isSingleMonth
-    ? (presentations[getMonthKey(dateRange.from)] || 0)
-    : (presentations[currentMonthKey] || 0);
+  const currentMonthPres = presentations[selectedMonthKey] || { bluepex: 0, opus: 0 };
 
   const kpis = useMemo(() => {
     let projected = 0;
     let paid = 0;
     filteredDeals.forEach((deal) => {
+      const presCount = getPresentationsForDeal(deal, presentations);
       const dealMonthKey = getMonthKey(deal.closingDate);
-      const dealPresentations = presentations[dealMonthKey] || 0;
       const dealSuperMeta = superMeta[dealMonthKey] || false;
-      const comm = calculateCommission(deal, dealPresentations, settings, dealSuperMeta);
+      const comm = calculateCommission(deal, presCount, settings, dealSuperMeta);
       projected += comm.totalCommission;
       if (deal.paymentStatus === "Pago") paid += comm.totalCommission;
     });
-    return { salary: settings.fixedSalary, projected, paid, total: settings.fixedSalary + paid, presentations: periodPresentations };
-  }, [filteredDeals, presentations, settings, periodPresentations, superMeta]);
-
-  const payableData = useMemo(() => {
-    if (!isSingleMonth) return { deals: [], total: 0, paidTotal: 0 };
-    const payable = deals.filter((d) => {
-      const payMonth = getPayableMonthKey(d.closingDate);
-      return payMonth === selectedMonthKey;
-    });
-    let total = 0;
-    let paidTotal = 0;
-    payable.forEach((deal) => {
-      const dealMonthKey = getMonthKey(deal.closingDate);
-      const dealPres = presentations[dealMonthKey] || 0;
-      const dealSuperMeta = superMeta[dealMonthKey] || false;
-      const comm = calculateCommission(deal, dealPres, settings, dealSuperMeta);
-      total += comm.totalCommission;
-      if (deal.paymentStatus === "Pago") paidTotal += comm.totalCommission;
-    });
-    return { deals: payable, total, paidTotal };
-  }, [deals, isSingleMonth, selectedMonthKey, presentations, settings, superMeta]);
+    const totalPres = currentMonthPres.bluepex + currentMonthPres.opus;
+    return { salary: settings.fixedSalary, projected, paid, total: settings.fixedSalary + paid, presentations: totalPres };
+  }, [filteredDeals, presentations, settings, superMeta, currentMonthPres]);
 
   const handleStatusChange = (deal: Deal, status: PaymentStatus) => {
     addOrUpdateDeal({ ...deal, paymentStatus: status });
@@ -114,44 +82,29 @@ export default function Index() {
   };
 
   const handleDownloadReport = () => {
-    const prevMonth = new Date(dateRange.from);
-    prevMonth.setMonth(prevMonth.getMonth() - 1);
-    const prevMonthKey = getMonthKey(prevMonth);
-    const payableDeals = deals.filter((d) => getMonthKey(d.closingDate) === prevMonthKey);
-
     downloadReportPDF({
       deals: filteredDeals,
-      presentations: commissionPresentations,
+      presentations,
       salary: settings.fixedSalary,
       periodLabel,
       settings,
-      superMetaActive,
-      payableDeals,
-      payablePresentations: presentations[prevMonthKey] || 0,
+      superMeta,
     });
   };
 
   const handlePrintReport = () => {
-    const prevMonth = new Date(dateRange.from);
-    prevMonth.setMonth(prevMonth.getMonth() - 1);
-    const prevMonthKey = getMonthKey(prevMonth);
-    const payableDeals = deals.filter((d) => getMonthKey(d.closingDate) === prevMonthKey);
-
     printReport({
       deals: filteredDeals,
-      presentations: commissionPresentations,
+      presentations,
       salary: settings.fixedSalary,
       periodLabel,
       settings,
-      superMetaActive,
-      payableDeals,
-      payablePresentations: presentations[prevMonthKey] || 0,
+      superMeta,
     });
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b border-border/60 bg-card/80 backdrop-blur-sm sticky top-0 z-30">
         <div className="container flex items-center justify-between h-14">
           <div className="flex items-center gap-2.5">
@@ -180,12 +133,10 @@ export default function Index() {
       </header>
 
       <main className="container py-5">
-        {/* Period filter - global */}
         <div className="mb-4">
           <PeriodFilter onPeriodChange={handlePeriodChange} />
         </div>
 
-        {/* Main tabs */}
         <Tabs defaultValue="dashboard">
           <TabsList className="h-9 mb-5">
             <TabsTrigger value="dashboard" className="text-xs gap-1.5">
@@ -202,7 +153,6 @@ export default function Index() {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-5 mt-0">
-            {/* Period header with Super Meta */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <h2 className="text-sm font-semibold text-foreground">{periodLabel}</h2>
@@ -222,7 +172,6 @@ export default function Index() {
               )}
             </div>
 
-            {/* KPI Row */}
             <div>
               <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold">Comissões geradas no período</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -232,8 +181,9 @@ export default function Index() {
                 <KpiCard title="Total Período" value={formatCurrency(kpis.total)} icon={DollarSign} variant="warning" />
                 {isSingleMonth ? (
                   <PresentationsCard
-                    count={presentations[getMonthKey(dateRange.from)] || 0}
-                    onChange={(c) => updatePresentations(getMonthKey(dateRange.from), c)}
+                    data={currentMonthPres}
+                    onChangeBluepex={(c) => updatePresentations(selectedMonthKey, "bluepex", c)}
+                    onChangeOpus={(c) => updatePresentations(selectedMonthKey, "opus", c)}
                   />
                 ) : (
                   <KpiCard
@@ -243,38 +193,14 @@ export default function Index() {
                     trend="Soma do período"
                   />
                 )}
-                {isSingleMonth && (
-                  <KpiCard
-                    title="Meta"
-                    value={kpis.presentations >= 15 ? "Atingida ✓" : `Faltam ${15 - kpis.presentations}`}
-                    icon={CalendarDays}
-                    trend={`${kpis.presentations}/15 apresentações`}
-                    variant={kpis.presentations >= 15 ? "success" : "default"}
-                  />
-                )}
               </div>
             </div>
-
-            {/* Payable commissions */}
-            {isSingleMonth && payableData.deals.length > 0 && (
-              <div>
-                <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold flex items-center gap-1">
-                  <ArrowDownToLine className="h-3 w-3" />
-                  A receber este mês (mês anterior)
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <KpiCard title="A Receber" value={formatCurrency(payableData.total)} icon={ArrowDownToLine} variant="primary" />
-                  <KpiCard title="Já Pago" value={formatCurrency(payableData.paidTotal)} icon={BadgeDollarSign} variant="success" />
-                  <KpiCard title="Pendente" value={formatCurrency(payableData.total - payableData.paidTotal)} icon={Wallet} />
-                </div>
-              </div>
-            )}
 
             <OperationsChart deals={filteredDeals} />
 
             <DealsTable
               deals={filteredDeals}
-              presentations={commissionPresentations}
+              presentations={presentations}
               settings={settings}
               superMetaActive={superMetaActive}
               onEdit={handleEdit}
@@ -285,7 +211,6 @@ export default function Index() {
 
           <TabsContent value="receivables" className="mt-0">
             <ReceivablesFlow
-              deals={filteredDeals}
               allDeals={deals}
               settings={settings}
               presentations={presentations}

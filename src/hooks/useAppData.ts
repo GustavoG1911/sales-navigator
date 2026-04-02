@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings, ReceivableAdjustments, ReceivableAdjustment } from "@/lib/types";
+import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings, ReceivableAdjustments, ReceivableAdjustment, OperationPresentations } from "@/lib/types";
 import { getPresentations, savePresentations, getSettings, saveSettings, getSuperMeta, saveSuperMeta, getAdjustments, saveAdjustments } from "@/lib/store";
 import { fetchDeals, upsertDeal, deleteDealFromDb } from "@/lib/supabase-deals";
 import { toast } from "sonner";
@@ -48,8 +48,9 @@ export function useAppData() {
     }
   }, [loadDeals]);
 
-  const updatePresentations = useCallback((monthKey: string, count: number) => {
-    const updated = { ...presentations, [monthKey]: count };
+  const updatePresentations = useCallback((monthKey: string, operation: "bluepex" | "opus", count: number) => {
+    const current = presentations[monthKey] || { bluepex: 0, opus: 0 };
+    const updated = { ...presentations, [monthKey]: { ...current, [operation]: count } };
     savePresentations(updated);
     setPresentations(updated);
   }, [presentations]);

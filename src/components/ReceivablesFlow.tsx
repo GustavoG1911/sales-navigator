@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { Deal, AppSettings, MonthlyPresentations, MonthlySuperMeta, ReceivableAdjustments, ReceivableAdjustment, PaymentStatus } from "@/lib/types";
-import { calculateCommission, formatCurrency, getMonthKey, getPayableMonthKey } from "@/lib/commission";
+import { calculateCommission, formatCurrency, getMonthKey, getPayableMonthKey, getPresentationsForDeal } from "@/lib/commission";
 import { DateRange } from "@/components/PeriodFilter";
 import { KpiCard } from "@/components/KpiCard";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, ArrowDownToLine, TrendingUp } from "lucide-react";
+import { Wallet, ArrowDownToLine, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
 
 interface ReceivableEntry {
   id: string;
@@ -15,13 +15,14 @@ interface ReceivableEntry {
   label: string;
   clientName?: string;
   dealId?: string;
+  deal?: Deal;
   dueDate: string;
   baseValue: number;
   status: PaymentStatus;
+  commBreakdown?: ReturnType<typeof calculateCommission>;
 }
 
 interface Props {
-  deals: Deal[];
   allDeals: Deal[];
   settings: AppSettings;
   presentations: MonthlyPresentations;
@@ -32,8 +33,41 @@ interface Props {
   onStatusChange: (deal: Deal, status: PaymentStatus) => void;
 }
 
+function CommissionDetailRow({ entry }: { entry: ReceivableEntry }) {
+  if (!entry.deal || !entry.commBreakdown) return null;
+  const comm = entry.commBreakdown;
+  const deal = entry.deal;
+  const basePercent = comm.monthlyBaseRate === 1 ? "100%" : "70%";
+  const ratePercent = (comm.commissionRate * 100).toFixed(0) + "%";
+
+  return (
+    <div className="px-4 py-3 bg-muted/20 border-t border-border/20 text-xs text-muted-foreground space-y-1.5">
+      <p className="font-semibold text-foreground text-[11px] uppercase tracking-wider mb-2">Detalhamento do Cálculo</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="p-2 rounded bg-muted/30">
+          <span className="font-medium text-foreground">Mensalidade:</span>{" "}
+          {formatCurrency(deal.monthlyValue)} × {basePercent} × {ratePercent} = <span className="font-bold text-primary">{formatCurrency(comm.monthlyCommission)}</span>
+        </div>
+        <div className="p-2 rounded bg-muted/30">
+          <span className="font-medium text-foreground">Implantação:</span>{" "}
+          {formatCurrency(deal.implantationValue)} × 40% × {ratePercent} = <span className="font-bold text-primary">{formatCurrency(comm.implantationCommission)}</span>
+        </div>
+      </div>
+      {comm.superMetaBonus > 0 && (
+        <div className="p-2 rounded bg-warning/10 border border-warning/20">
+          <span className="font-medium text-warning">⚡ Super Meta:</span>{" "}
+          <span className="font-bold text-warning">{formatCurrency(comm.superMetaBonus)}</span>
+        </div>
+      )}
+      <div className="pt-1 border-t border-border/30">
+        <span className="font-medium text-foreground">Total Comissão:</span>{" "}
+        <span className="font-bold text-primary text-sm">{formatCurrency(comm.totalCommission)}</span>
+      </div>
+    </div>
+  );
+}
+
 export function ReceivablesFlow({
-  deals,
   allDeals,
   settings,
   presentations,
@@ -43,7 +77,7 @@ export function ReceivablesFlow({
   onUpdateAdjustment,
   onStatusChange,
 }: Props) {
-  const isSingleMonth = dateRange.from.getMonth() === dateRange.to.getMonth() && dateRange.from.getFullYear() === dateRange.to.getFullYear();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const entries = useMemo(() => {
     const result: ReceivableEntry[] = [];
@@ -65,7 +99,7 @@ export function ReceivablesFlow({
       });
     }
 
-    // Add commission entries from deals payable in this period
+    // Filter deals by PAYMENT date (payable month falls within dateRange)
     const payableDeals = allDeals.filter((d) => {
       const payMonth = getPayableMonthKey(d.closingDate);
       const payDate = new Date(payMonth + "-20");
@@ -73,10 +107,9 @@ export function ReceivablesFlow({
     });
 
     payableDeals.forEach((deal) => {
-      const dealMonthKey = getMonthKey(deal.closingDate);
-      const dealPres = presentations[dealMonthKey] || 0;
-      const dealSuperMeta = superMeta[dealMonthKey] || false;
-      const comm = calculateCommission(deal, dealPres, settings, dealSuperMeta);
+      const presCount = getPresentationsForDeal(deal, presentations);
+      const dealSuperMeta = superMeta[getMonthKey(deal.closingDate)] || false;
+      const comm = calculateCommission(deal, presCount, settings, dealSuperMeta);
       const payMonthKey = getPayableMonthKey(deal.closingDate);
       const dueDate = new Date(payMonthKey + "-20").toISOString();
 
@@ -87,9 +120,11 @@ export function ReceivablesFlow({
           label: "Comissão Mensalidade",
           clientName: deal.clientName,
           dealId: deal.id,
+          deal,
           dueDate,
           baseValue: comm.monthlyCommission,
           status: deal.paymentStatus,
+          commBreakdown: comm,
         });
       }
 
@@ -100,9 +135,11 @@ export function ReceivablesFlow({
           label: "Comissão Implantação",
           clientName: deal.clientName,
           dealId: deal.id,
+          deal,
           dueDate,
           baseValue: comm.implantationCommission,
           status: deal.paymentStatus,
+          commBreakdown: comm,
         });
       }
 
@@ -113,14 +150,15 @@ export function ReceivablesFlow({
           label: "Bônus Super Meta",
           clientName: deal.clientName,
           dealId: deal.id,
+          deal,
           dueDate,
           baseValue: comm.superMetaBonus,
           status: deal.paymentStatus,
+          commBreakdown: comm,
         });
       }
     });
 
-    // Sort by due date
     result.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
     return result;
   }, [allDeals, settings, presentations, superMeta, dateRange]);
@@ -169,20 +207,23 @@ export function ReceivablesFlow({
     return map[type];
   };
 
+  const toggleExpand = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
   return (
     <div className="space-y-5">
-      {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <KpiCard title="A Receber (Mês)" value={formatCurrency(summary.toReceive)} icon={ArrowDownToLine} variant="primary" />
         <KpiCard title="Recebido (Mês)" value={formatCurrency(summary.received)} icon={Wallet} variant="success" />
         <KpiCard title="Saldo Futuro Projetado" value={formatCurrency(summary.projected)} icon={TrendingUp} variant="warning" />
       </div>
 
-      {/* Receivables table */}
       <div className="rounded-lg border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30">
+              <TableHead className="text-[11px] font-semibold uppercase tracking-wider w-[32px]"></TableHead>
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider w-[100px]">Vencimento</TableHead>
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider">Tipo</TableHead>
               <TableHead className="text-[11px] font-semibold uppercase tracking-wider">Cliente / Descrição</TableHead>
@@ -196,7 +237,7 @@ export function ReceivablesFlow({
           <TableBody>
             {entries.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8 text-sm">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-8 text-sm">
                   Nenhum lançamento para o período selecionado
                 </TableCell>
               </TableRow>
@@ -206,97 +247,118 @@ export function ReceivablesFlow({
               const adjustmentVal = adj?.adjustment || 0;
               const finalValue = entry.baseValue + adjustmentVal;
               const badgeInfo = getTypeBadge(entry.type);
-              const dueDate = adj?.effectiveDate
-                ? new Date(adj.effectiveDate)
-                : new Date(entry.dueDate);
+              const hasDetail = entry.type !== "salary" && entry.commBreakdown;
+              const isExpanded = expandedId === entry.id;
 
               return (
-                <TableRow key={entry.id} className="group">
-                  <TableCell className="px-3 py-2">
-                    <Input
-                      type="date"
-                      className="h-7 text-xs w-[100px] border-transparent group-hover:border-input"
-                      value={
-                        adj?.effectiveDate
-                          ? adj.effectiveDate.slice(0, 10)
-                          : entry.dueDate.slice(0, 10)
-                      }
-                      onChange={(e) =>
-                        handleAdjustmentChange(entry.id, "effectiveDate", e.target.value)
-                      }
-                    />
-                  </TableCell>
-                  <TableCell className="px-3 py-2">
-                    <Badge variant={badgeInfo.variant} className="text-[10px] font-medium">
-                      {badgeInfo.label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="px-3 py-2 text-sm">
-                    {entry.clientName || entry.label}
-                  </TableCell>
-                  <TableCell className="px-3 py-2 text-right font-bold tracking-tight text-sm">
-                    {formatCurrency(entry.baseValue)}
-                  </TableCell>
-                  <TableCell className="px-3 py-2">
-                    <Input
-                      type="number"
-                      className="h-7 text-xs text-center w-[90px] mx-auto border-transparent group-hover:border-input"
-                      placeholder="0,00"
-                      value={adjustmentVal || ""}
-                      onChange={(e) =>
-                        handleAdjustmentChange(entry.id, "adjustment", parseFloat(e.target.value) || 0)
-                      }
-                    />
-                  </TableCell>
-                  <TableCell className="px-3 py-2">
-                    <Input
-                      className="h-7 text-xs border-transparent group-hover:border-input"
-                      placeholder="Motivo..."
-                      value={adj?.reason || ""}
-                      onChange={(e) =>
-                        handleAdjustmentChange(entry.id, "reason", e.target.value)
-                      }
-                    />
-                  </TableCell>
-                  <TableCell className="px-3 py-2 text-right font-bold tracking-tight text-sm">
-                    <span className={adjustmentVal !== 0 ? (adjustmentVal > 0 ? "text-emerald-600" : "text-red-500") : ""}>
-                      {formatCurrency(finalValue)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="px-3 py-2 text-right">
-                    {entry.type === "salary" ? (
-                      <Select
-                        value={adjustments[entry.id]?.salaryPaid ? "Pago" : "Pendente"}
-                        onValueChange={(v) => {
-                          const existing = adjustments[entry.id] || { id: entry.id, adjustment: 0, reason: "", effectiveDate: "" };
-                          onUpdateAdjustment({ ...existing, salaryPaid: v === "Pago" });
-                        }}
-                      >
-                        <SelectTrigger className="h-7 w-[90px] text-[11px] ml-auto">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Pendente">Pendente</SelectItem>
-                          <SelectItem value="Pago">Pago</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Select
-                        value={entry.status}
-                        onValueChange={(v) => handleStatusToggle(entry, v as PaymentStatus)}
-                      >
-                        <SelectTrigger className="h-7 w-[90px] text-[11px] ml-auto">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Pendente">Pendente</SelectItem>
-                          <SelectItem value="Pago">Pago</SelectItem>
-                          <SelectItem value="Cancelado">Cancelado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </TableCell>
-                </TableRow>
+                <>
+                  <TableRow
+                    key={entry.id}
+                    className={`group ${hasDetail ? "cursor-pointer" : ""}`}
+                    onClick={() => hasDetail && toggleExpand(entry.id)}
+                  >
+                    <TableCell className="px-2 py-2">
+                      {hasDetail && (
+                        isExpanded ? (
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        )
+                      )}
+                    </TableCell>
+                    <TableCell className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                      <Input
+                        type="date"
+                        className="h-7 text-xs w-[100px] border-transparent group-hover:border-input"
+                        value={
+                          adj?.effectiveDate
+                            ? adj.effectiveDate.slice(0, 10)
+                            : entry.dueDate.slice(0, 10)
+                        }
+                        onChange={(e) =>
+                          handleAdjustmentChange(entry.id, "effectiveDate", e.target.value)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="px-3 py-2">
+                      <Badge variant={badgeInfo.variant} className="text-[10px] font-medium">
+                        {badgeInfo.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-sm">
+                      {entry.clientName || entry.label}
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-right font-bold tracking-tight text-sm">
+                      {formatCurrency(entry.baseValue)}
+                    </TableCell>
+                    <TableCell className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                      <Input
+                        type="number"
+                        className="h-7 text-xs text-center w-[90px] mx-auto border-transparent group-hover:border-input"
+                        placeholder="0,00"
+                        value={adjustmentVal || ""}
+                        onChange={(e) =>
+                          handleAdjustmentChange(entry.id, "adjustment", parseFloat(e.target.value) || 0)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                      <Input
+                        className="h-7 text-xs border-transparent group-hover:border-input"
+                        placeholder="Motivo..."
+                        value={adj?.reason || ""}
+                        onChange={(e) =>
+                          handleAdjustmentChange(entry.id, "reason", e.target.value)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-right font-bold tracking-tight text-sm">
+                      <span className={adjustmentVal !== 0 ? (adjustmentVal > 0 ? "text-emerald-600" : "text-red-500") : ""}>
+                        {formatCurrency(finalValue)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                      {entry.type === "salary" ? (
+                        <Select
+                          value={adjustments[entry.id]?.salaryPaid ? "Pago" : "Pendente"}
+                          onValueChange={(v) => {
+                            const existing = adjustments[entry.id] || { id: entry.id, adjustment: 0, reason: "", effectiveDate: "" };
+                            onUpdateAdjustment({ ...existing, salaryPaid: v === "Pago" });
+                          }}
+                        >
+                          <SelectTrigger className="h-7 w-[90px] text-[11px] ml-auto">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Pendente">Pendente</SelectItem>
+                            <SelectItem value="Pago">Pago</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Select
+                          value={entry.status}
+                          onValueChange={(v) => handleStatusToggle(entry, v as PaymentStatus)}
+                        >
+                          <SelectTrigger className="h-7 w-[90px] text-[11px] ml-auto">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Pendente">Pendente</SelectItem>
+                            <SelectItem value="Pago">Pago</SelectItem>
+                            <SelectItem value="Cancelado">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                  {isExpanded && hasDetail && (
+                    <TableRow key={`${entry.id}-detail`} className="hover:bg-transparent">
+                      <TableCell colSpan={9} className="p-0">
+                        <CommissionDetailRow entry={entry} />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               );
             })}
           </TableBody>
