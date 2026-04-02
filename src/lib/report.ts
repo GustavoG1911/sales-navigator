@@ -1,22 +1,19 @@
-import { Deal, AppSettings } from "@/lib/types";
-import { calculateCommission, formatCurrency } from "@/lib/commission";
+import { Deal, AppSettings, MonthlyPresentations, MonthlySuperMeta } from "@/lib/types";
+import { calculateCommission, formatCurrency, getMonthKey, getPresentationsForDeal } from "@/lib/commission";
 import { format } from "date-fns";
 
 interface ReportData {
   deals: Deal[];
-  presentations: number;
+  presentations: MonthlyPresentations;
   salary: number;
   periodLabel: string;
   settings: AppSettings;
-  superMetaActive: boolean;
-  payableDeals?: Deal[];
-  payablePresentations?: number;
+  superMeta: MonthlySuperMeta;
 }
 
 export function generateReportHTML(data: ReportData): string {
-  const { deals, presentations, salary, periodLabel, settings, superMetaActive } = data;
+  const { deals, presentations, salary, periodLabel, settings, superMeta } = data;
   const rate = ((settings.commissionRate || 0.20) * 100).toFixed(0);
-  const meetsTarget = presentations >= 15;
 
   let totalProjected = 0;
   let totalPaid = 0;
@@ -27,7 +24,10 @@ export function generateReportHTML(data: ReportData): string {
   let opusTechVolume = 0;
 
   const rows = deals.map((deal) => {
-    const comm = calculateCommission(deal, presentations, settings, superMetaActive);
+    const presCount = getPresentationsForDeal(deal, presentations);
+    const dealMonthKey = getMonthKey(deal.closingDate);
+    const dealSuperMeta = superMeta[dealMonthKey] || false;
+    const comm = calculateCommission(deal, presCount, settings, dealSuperMeta);
     totalProjected += comm.totalCommission;
     if (deal.paymentStatus === "Pago") totalPaid += comm.totalCommission;
     totalMonthly += deal.monthlyValue;
@@ -36,6 +36,8 @@ export function generateReportHTML(data: ReportData): string {
     const vol = deal.monthlyValue + deal.implantationValue;
     if (deal.operation === "BluePex") bluePexVolume += vol;
     else opusTechVolume += vol;
+
+    const basePercent = comm.monthlyBaseRate === 1 ? "100%" : "70%";
 
     return `
       <tr>
@@ -49,52 +51,16 @@ export function generateReportHTML(data: ReportData): string {
         ${comm.superMetaBonus > 0 ? `<td class="num bold" style="color:#eab308">${formatCurrency(comm.superMetaBonus)}</td>` : `<td class="num">—</td>`}
         <td class="num bold">${formatCurrency(comm.totalCommission)}</td>
         <td><span class="status status-${deal.paymentStatus.toLowerCase()}">${deal.paymentStatus}</span></td>
+      </tr>
+      <tr class="detail-row">
+        <td colspan="10" style="padding:4px 10px 8px 10px;background:#f8fafa;font-size:11px;color:#64748b;">
+          <strong>Mensalidade:</strong> ${formatCurrency(deal.monthlyValue)} × ${basePercent} × ${rate}% = ${formatCurrency(comm.monthlyCommission)}
+          &nbsp;|&nbsp;
+          <strong>Implantação:</strong> ${formatCurrency(deal.implantationValue)} × 40% × ${rate}% = ${formatCurrency(comm.implantationCommission)}
+          ${comm.superMetaBonus > 0 ? `&nbsp;|&nbsp;<strong style="color:#eab308">⚡ Super Meta:</strong> ${formatCurrency(comm.superMetaBonus)}` : ""}
+        </td>
       </tr>`;
   });
-
-  // Payable section (commissions from previous month to be paid this month)
-  let payableSection = "";
-  if (data.payableDeals && data.payableDeals.length > 0) {
-    let payableTotal = 0;
-    const payableRows = data.payableDeals.map((deal) => {
-      const pres = data.payablePresentations || 0;
-      const comm = calculateCommission(deal, pres, settings, false);
-      payableTotal += comm.totalCommission;
-      return `
-        <tr>
-          <td>${format(new Date(deal.closingDate), "dd/MM/yyyy")}</td>
-          <td>${deal.clientName}</td>
-          <td><span class="badge ${deal.operation === "BluePex" ? "badge-blue" : "badge-purple"}">${deal.operation}</span></td>
-          <td class="num bold">${formatCurrency(comm.totalCommission)}</td>
-          <td><span class="status status-${deal.paymentStatus.toLowerCase()}">${deal.paymentStatus}</span></td>
-        </tr>`;
-    });
-
-    payableSection = `
-    <div class="section" style="page-break-before: auto;">
-      <h2>Comissões a Receber Neste Mês (fechamentos do mês anterior)</h2>
-      <p style="font-size:12px;color:#64748b;margin-bottom:12px">Comissões pagas até o dia 20 deste mês, referentes a fechamentos do período anterior.</p>
-      <table>
-        <thead>
-          <tr>
-            <th>Data Fech.</th>
-            <th>Cliente</th>
-            <th>Operação</th>
-            <th class="num">Comissão</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${payableRows.join("")}
-          <tr class="totals-row">
-            <td colspan="3">TOTAL A RECEBER</td>
-            <td class="num bold">${formatCurrency(payableTotal)}</td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>`;
-  }
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -120,6 +86,8 @@ export function generateReportHTML(data: ReportData): string {
   th { background: #f1f5f9; text-align: left; padding: 8px 10px; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; }
   td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; }
   tr:hover { background: #fafbfc; }
+  .detail-row td { border-bottom: 2px solid #e2e8f0; }
+  .detail-row:hover { background: #f8fafa; }
   .num { text-align: right; font-family: 'Courier New', monospace; }
   .bold { font-weight: 700; color: #0d9488; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
@@ -147,9 +115,7 @@ export function generateReportHTML(data: ReportData): string {
       <div class="subtitle">Período: ${periodLabel}</div>
     </div>
     <div class="date">
-      Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}<br>
-      Apresentações: ${presentations} ${meetsTarget ? "(meta atingida)" : "(abaixo da meta)"}
-      ${superMetaActive ? "<br><strong style='color:#eab308'>⚡ Super Meta Ativa</strong>" : ""}
+      Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}
     </div>
   </div>
 
@@ -213,15 +179,13 @@ export function generateReportHTML(data: ReportData): string {
     <p style="font-size:11px;color:#94a3b8;margin-top:8px">* Estas comissões serão pagas até o dia 20 do mês subsequente.</p>
   </div>
 
-  ${payableSection}
-
   <div class="section">
     <h2>Regras Aplicadas</h2>
     <div class="rules">
-      <p><strong>Comissão sobre Mensalidade:</strong> ${meetsTarget ? "100%" : "70%"} do valor × ${rate}% (${presentations} apresentações — ${meetsTarget ? "≥ 15, meta atingida" : "< 15, abaixo da meta"})</p>
+      <p><strong>Comissão sobre Mensalidade:</strong> Base 100% (≥ 15 apres.) ou 70% (&lt; 15 apres.) × ${rate}% — verificada por operação no mês de fechamento</p>
       <p style="margin-top:6px"><strong>Comissão sobre Implantação:</strong> 40% do valor × ${rate}% (independente de apresentações)</p>
       <p style="margin-top:6px"><strong>Pagamento:</strong> Comissões pagas até o dia 20 do mês subsequente ao fechamento</p>
-      ${superMetaActive ? `<p style="margin-top:6px;color:#eab308"><strong>⚡ Super Meta:</strong> ≥ ${settings.superMetaThreshold} apresentações → comissão mensal × ${((settings.superMetaMultiplier || 2) * 100).toFixed(0)}%</p>` : ""}
+      <p style="margin-top:6px"><strong>Metas por Operação:</strong> BluePex e Opus Tech possuem contadores de apresentações separados</p>
     </div>
   </div>
 
@@ -239,7 +203,6 @@ export function downloadReportPDF(data: ReportData) {
   if (win) {
     win.document.write(html);
     win.document.close();
-    // Add print-to-PDF instruction
     setTimeout(() => {
       win.print();
     }, 600);
