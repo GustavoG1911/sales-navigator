@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, Zap, ArrowDownToLine, BarChart3, Receipt, LogOut } from "lucide-react";
+import { SystemSettingsPanel } from "@/components/SystemSettingsPanel";
+import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, Zap, ArrowDownToLine, BarChart3, Receipt, LogOut, Settings } from "lucide-react";
 
 export default function Index() {
   const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment, refreshDeals } = useAppData();
@@ -148,14 +149,16 @@ export default function Index() {
               <BarChart3 className="h-3.5 w-3.5" />
               Dashboard de Vendas
             </TabsTrigger>
-            {isAdmin && (
-              <TabsTrigger value="receivables" className="text-xs gap-1.5">
-                <Receipt className="h-3.5 w-3.5" />
-                Fluxo de Recebíveis
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="receivables" className="text-xs gap-1.5">
+              <Receipt className="h-3.5 w-3.5" />
+              Fluxo de Recebíveis
+            </TabsTrigger>
             <TabsTrigger value="settings" className="text-xs gap-1.5">
               Parâmetros
+            </TabsTrigger>
+            <TabsTrigger value="system" className="text-xs gap-1.5">
+              <Settings className="h-3.5 w-3.5" />
+              Configurações
             </TabsTrigger>
           </TabsList>
 
@@ -179,31 +182,29 @@ export default function Index() {
               )}
             </div>
 
-            {isAdmin && (
-              <div>
-                <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold">Comissões geradas no período</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                  <KpiCard title="Salário Fixo" value={formatCurrency(kpis.salary)} icon={Wallet} />
-                  <KpiCard title={`Projetada ${periodSuffix}`} value={formatCurrency(kpis.projected)} icon={TrendingUp} variant="primary" />
-                  <KpiCard title={`Paga ${periodSuffix}`} value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" />
-                  <KpiCard title={`Total ${periodSuffix}`} value={formatCurrency(kpis.total)} icon={DollarSign} variant="warning" />
-                  {isSingleMonth ? (
-                    <PresentationsCard
-                      data={currentMonthPres}
-                      onChangeBluepex={(c) => updatePresentations(selectedMonthKey, "bluepex", c)}
-                      onChangeOpus={(c) => updatePresentations(selectedMonthKey, "opus", c)}
-                    />
-                  ) : (
-                    <KpiCard
-                      title="Apresentações"
-                      value={kpis.presentations.toString()}
-                      icon={CalendarDays}
-                      trend="Soma do período"
-                    />
-                  )}
-                </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold">Comissões geradas no período</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <KpiCard title="Salário Fixo" value={formatCurrency(kpis.salary)} icon={Wallet} />
+                <KpiCard title={`Projetada ${periodSuffix}`} value={formatCurrency(kpis.projected)} icon={TrendingUp} variant="primary" />
+                <KpiCard title={`Paga ${periodSuffix}`} value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" />
+                <KpiCard title={`Total ${periodSuffix}`} value={formatCurrency(kpis.total)} icon={DollarSign} variant="warning" />
+                {isSingleMonth ? (
+                  <PresentationsCard
+                    data={currentMonthPres}
+                    onChangeBluepex={(c) => updatePresentations(selectedMonthKey, "bluepex", c)}
+                    onChangeOpus={(c) => updatePresentations(selectedMonthKey, "opus", c)}
+                  />
+                ) : (
+                  <KpiCard
+                    title="Apresentações"
+                    value={kpis.presentations.toString()}
+                    icon={CalendarDays}
+                    trend="Soma do período"
+                  />
+                )}
               </div>
-            )}
+            </div>
 
             <OperationsChart deals={filteredDeals} />
 
@@ -218,23 +219,25 @@ export default function Index() {
             />
           </TabsContent>
 
-          {isAdmin && (
-            <TabsContent value="receivables" className="mt-0">
-              <ReceivablesFlow
-                allDeals={deals}
-                settings={settings}
-                presentations={presentations}
-                superMeta={superMeta}
-                dateRange={dateRange}
-                adjustments={adjustments}
-                onUpdateAdjustment={updateAdjustment}
-                onStatusChange={handleStatusChange}
-              />
-            </TabsContent>
-          )}
+          <TabsContent value="receivables" className="mt-0">
+            <ReceivablesFlow
+              allDeals={deals}
+              settings={settings}
+              presentations={presentations}
+              superMeta={superMeta}
+              dateRange={dateRange}
+              adjustments={adjustments}
+              onUpdateAdjustment={updateAdjustment}
+              onStatusChange={handleStatusChange}
+            />
+          </TabsContent>
 
           <TabsContent value="settings" className="mt-0">
             <SettingsPanel settings={settings} onSave={updateSettings} onRefreshDeals={refreshDeals} />
+          </TabsContent>
+
+          <TabsContent value="system" className="mt-0">
+            <SystemSettingsPanel />
           </TabsContent>
         </Tabs>
       </main>
