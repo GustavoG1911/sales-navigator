@@ -25,7 +25,7 @@ export const useAuth = () => useContext(AuthContext);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<UserRole>("sdr");
+  const [role, setRole] = useState<UserRole>("admin");
 
   const fetchRole = async (userId: string) => {
     const { data } = await supabase
