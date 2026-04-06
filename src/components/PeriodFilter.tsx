@@ -16,7 +16,7 @@ export interface DateRange {
 }
 
 interface PeriodFilterProps {
-  onPeriodChange: (range: DateRange, label: string) => void;
+  onPeriodChange: (range: DateRange, label: string, periodType: PeriodType) => void;
 }
 
 function getMonthRange(year: number, month: number): DateRange {
@@ -81,13 +81,13 @@ export function PeriodFilter({ onPeriodChange }: PeriodFilterProps) {
   const handlePresetChange = (value: string) => {
     const allOptions = [...monthOptions, ...quarterOptions, ...yearOptions];
     const opt = allOptions.find((o) => o.value === value);
-    if (opt) onPeriodChange(opt.range, opt.label);
+    if (opt) onPeriodChange(opt.range, opt.label, periodType);
   };
 
   const handleCustomApply = () => {
     if (customFrom && customTo) {
       const label = `${format(customFrom, "dd/MM/yy")} — ${format(customTo, "dd/MM/yy")}`;
-      onPeriodChange({ from: customFrom, to: new Date(customTo.getFullYear(), customTo.getMonth(), customTo.getDate(), 23, 59, 59) }, label);
+      onPeriodChange({ from: customFrom, to: new Date(customTo.getFullYear(), customTo.getMonth(), customTo.getDate(), 23, 59, 59) }, label, "custom");
     }
   };
 
