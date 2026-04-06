@@ -218,16 +218,20 @@ export default function Index() {
             />
           </TabsContent>
 
-          <TabsContent value="receivables" className="mt-0">
-            <ReceivablesFlow
-              allDeals={deals}
-              settings={settings}
-              presentations={presentations}
-              superMeta={superMeta}
-              dateRange={dateRange}
-              adjustments={adjustments}
-              onUpdateAdjustment={updateAdjustment}
-              onStatusChange={handleStatusChange}
+          {isAdmin && (
+            <TabsContent value="receivables" className="mt-0">
+              <ReceivablesFlow
+                allDeals={deals}
+                settings={settings}
+                presentations={presentations}
+                superMeta={superMeta}
+                dateRange={dateRange}
+                adjustments={adjustments}
+                onUpdateAdjustment={updateAdjustment}
+                onStatusChange={handleStatusChange}
+              />
+            </TabsContent>
+          )}
             />
           </TabsContent>
 
