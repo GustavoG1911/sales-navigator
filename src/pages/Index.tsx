@@ -16,12 +16,15 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SystemSettingsPanel } from "@/components/SystemSettingsPanel";
-import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, Zap, ArrowDownToLine, BarChart3, Receipt, LogOut, Settings } from "lucide-react";
+import { OnboardingModal } from "@/components/OnboardingModal";
+import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, Zap, ArrowDownToLine, BarChart3, Receipt, LogOut, Settings, User } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function Index() {
   const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment, refreshDeals } = useAppData();
-  const { signOut } = useAuth();
+  const { signOut, role } = useAuth();
+  const navigate = useNavigate();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const currentMonthKey = getMonthKey(new Date());
   const now = new Date();
@@ -130,6 +133,14 @@ export default function Index() {
             <Button onClick={handlePrintReport} size="sm" variant="ghost" className="h-8 w-8 p-0">
               <Printer className="h-3.5 w-3.5" />
             </Button>
+            <Button onClick={() => setProfileOpen(true)} size="sm" variant="ghost" className="h-8 w-8 p-0">
+              <User className="h-3.5 w-3.5" />
+            </Button>
+            {role === "admin" && (
+              <Button onClick={() => navigate("/settings")} size="sm" variant="ghost" className="h-8 w-8 p-0">
+                <Settings className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button onClick={signOut} size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground">
               <LogOut className="h-3.5 w-3.5" />
             </Button>
@@ -154,10 +165,6 @@ export default function Index() {
             </TabsTrigger>
             <TabsTrigger value="settings" className="text-xs gap-1.5">
               Parâmetros
-            </TabsTrigger>
-            <TabsTrigger value="system" className="text-xs gap-1.5">
-              <Settings className="h-3.5 w-3.5" />
-              Configurações
             </TabsTrigger>
           </TabsList>
 
@@ -235,11 +242,10 @@ export default function Index() {
             <SettingsPanel settings={settings} onSave={updateSettings} onRefreshDeals={refreshDeals} />
           </TabsContent>
 
-          <TabsContent value="system" className="mt-0">
-            <SystemSettingsPanel />
-          </TabsContent>
         </Tabs>
       </main>
+
+      <OnboardingModal forceOpen={profileOpen} onClose={() => setProfileOpen(false)} />
 
       <DealFormDialog
         open={formOpen}
