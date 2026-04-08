@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings, ReceivableAdjustments, ReceivableAdjustment, OperationPresentations } from "@/lib/types";
+import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings, ReceivableAdjustments, ReceivableAdjustment } from "@/lib/types";
 import { getPresentations, savePresentations, getSettings, saveSettings, getSuperMeta, saveSuperMeta, getAdjustments, saveAdjustments } from "@/lib/store";
 import { fetchDeals, upsertDeal, deleteDealFromDb } from "@/lib/supabase-deals";
 import { toast } from "sonner";

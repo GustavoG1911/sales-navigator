@@ -1,35 +1,58 @@
-import { CommissionBreakdown, Deal, AppSettings, MonthlyPresentations } from "./types";
+import { CommissionBreakdown, Deal, AppSettings, MonthlyPresentations, GlobalParameters } from "./types";
 
 const DEFAULT_COMMISSION_RATE = 0.20;
 
 /**
- * Calculate commission for a deal.
- * @param deal The deal
- * @param presentationsForOperation Number of presentations for this deal's operation in its closing month
- * @param settings App settings
- * @param superMetaActive Whether super meta is active for this month
+ * Get the commission tier rate based on presentations vs thresholds.
+ * Returns 0.7, 1.0, or 2.0
+ */
+export function getCommissionTier(
+  presentations: number,
+  metaThreshold: number,
+  superMetaThreshold: number
+): { rate: number; label: string } {
+  if (presentations >= superMetaThreshold) {
+    return { rate: 2.0, label: "Super Meta (200%)" };
+  }
+  if (presentations >= metaThreshold) {
+    return { rate: 1.0, label: "Meta (100%)" };
+  }
+  return { rate: 0.7, label: "70%" };
+}
+
+/**
+ * Calculate commission for a deal using 3-tier independent logic.
  */
 export function calculateCommission(
   deal: Deal,
   presentationsForOperation: number,
   settings?: AppSettings,
-  superMetaActive?: boolean
+  _superMetaActive?: boolean, // kept for backward compat, now ignored
+  globalParams?: GlobalParameters
 ): CommissionBreakdown {
   const rate = settings?.commissionRate ?? DEFAULT_COMMISSION_RATE;
-  const meetsTarget = presentationsForOperation >= 15;
-  const baseRate = meetsTarget ? 1 : 0.7;
+
+  // Get per-operation thresholds from global params
+  const metaThreshold = deal.operation === "BluePex"
+    ? (globalParams?.meta_apresentacoes_bluepex ?? 15)
+    : (globalParams?.meta_apresentacoes_opus ?? 15);
+
+  const superMetaThreshold = deal.operation === "BluePex"
+    ? (globalParams?.super_meta_bluepex ?? 30)
+    : (globalParams?.super_meta_opus ?? 30);
+
+  const tier = getCommissionTier(presentationsForOperation, metaThreshold, superMetaThreshold);
+  const baseRate = Math.min(tier.rate, 1.0); // base is capped at 1.0 for the monthly calc
   const monthlyBase = deal.monthlyValue * baseRate;
   const monthlyCommission = monthlyBase * rate;
 
   const implantationBase = deal.implantationValue * 0.4;
   const implantationCommission = implantationBase * rate;
 
+  // Super meta bonus: when tier is 2.0, the commission doubles (add another 1x)
   let superMetaBonus = 0;
-  if (superMetaActive && settings) {
-    const threshold = settings.superMetaThreshold || 30;
-    if (presentationsForOperation >= threshold) {
-      superMetaBonus = ((settings.superMetaMultiplier || 2) - 1) * monthlyCommission;
-    }
+  if (tier.rate >= 2.0) {
+    superMetaBonus = monthlyCommission; // doubles the monthly commission
   }
 
   return {
@@ -79,7 +102,6 @@ export function formatMonthLabel(key: string): string {
 
 /**
  * Given a deal's closing month, returns the month key when its commission is payable.
- * Commission is paid by the 20th of the NEXT month.
  */
 export function getPayableMonthKey(closingDate: string): string {
   const d = new Date(closingDate);

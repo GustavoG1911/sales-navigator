@@ -74,7 +74,10 @@ export type Database = {
           acelerador_teto: number | null
           base_implantacao: number | null
           id: string
-          meta_apresentacoes: number | null
+          meta_apresentacoes_bluepex: number | null
+          meta_apresentacoes_opus: number | null
+          super_meta_bluepex: number | null
+          super_meta_opus: number | null
           updated_at: string | null
         }
         Insert: {
@@ -82,7 +85,10 @@ export type Database = {
           acelerador_teto?: number | null
           base_implantacao?: number | null
           id?: string
-          meta_apresentacoes?: number | null
+          meta_apresentacoes_bluepex?: number | null
+          meta_apresentacoes_opus?: number | null
+          super_meta_bluepex?: number | null
+          super_meta_opus?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -90,7 +96,10 @@ export type Database = {
           acelerador_teto?: number | null
           base_implantacao?: number | null
           id?: string
-          meta_apresentacoes?: number | null
+          meta_apresentacoes_bluepex?: number | null
+          meta_apresentacoes_opus?: number | null
+          super_meta_bluepex?: number | null
+          super_meta_opus?: number | null
           updated_at?: string | null
         }
         Relationships: []

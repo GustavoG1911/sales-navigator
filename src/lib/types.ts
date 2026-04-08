@@ -41,6 +41,17 @@ export interface AppSettings {
   superMetaMultiplier: number;
 }
 
+export interface GlobalParameters {
+  id: string;
+  meta_apresentacoes_bluepex: number;
+  meta_apresentacoes_opus: number;
+  super_meta_bluepex: number;
+  super_meta_opus: number;
+  base_implantacao: number;
+  acelerador_teto: number;
+  acelerador_piso: number;
+}
+
 export interface CommissionBreakdown {
   monthlyBase: number;
   monthlyBaseRate: number; // 1.0 or 0.7
