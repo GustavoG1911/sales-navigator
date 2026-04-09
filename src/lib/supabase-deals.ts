@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Deal, PaymentStatus } from "./types";
 
 const dbToDeal = (db: any): Deal => ({
