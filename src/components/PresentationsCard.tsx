@@ -7,7 +7,7 @@ import { HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface PresentationsCardProps {
-  data: OperationPresentations;
+  presentations: OperationPresentations;
   globalParams?: GlobalParameters;
   onChangeBluepex: (count: number) => void;
   onChangeOpus: (count: number) => void;
@@ -29,14 +29,17 @@ function StatusBadge({ presentations, meta, superMeta }: { presentations: number
   );
 }
 
-export function PresentationsCard({ data, globalParams, onChangeBluepex, onChangeOpus }: PresentationsCardProps) {
+export function PresentationsCard({ presentations, globalParams, onChangeBluepex, onChangeOpus }: PresentationsCardProps) {
   const bpMeta = globalParams?.meta_apresentacoes_bluepex ?? 15;
   const bpSuperMeta = globalParams?.super_meta_bluepex ?? 30;
   const opMeta = globalParams?.meta_apresentacoes_opus ?? 15;
   const opSuperMeta = globalParams?.super_meta_opus ?? 30;
 
-  const bpTier = getCommissionTier(data.bluepex, bpMeta, bpSuperMeta);
-  const opTier = getCommissionTier(data.opus, opMeta, opSuperMeta);
+  const bluepexCount = presentations?.bluepex ?? 0;
+  const opusCount = presentations?.opus ?? 0;
+
+  const bpTier = getCommissionTier(bluepexCount, bpMeta, bpSuperMeta);
+  const opTier = getCommissionTier(opusCount, opMeta, opSuperMeta);
 
   return (
     <Card className="glass-card col-span-2">
@@ -61,23 +64,23 @@ export function PresentationsCard({ data, globalParams, onChangeBluepex, onChang
           <div>
             <div className="flex items-center gap-2 mb-1">
               <label className="text-[11px] font-semibold text-blue-500">BluePex</label>
-              <StatusBadge presentations={data.bluepex} meta={bpMeta} superMeta={bpSuperMeta} />
+              <StatusBadge presentations={bluepexCount} meta={bpMeta} superMeta={bpSuperMeta} />
             </div>
             <Input
               type="number"
               min={0}
-              value={data.bluepex}
+              value={bluepexCount}
               onChange={(e) => onChangeBluepex(Math.max(0, parseInt(e.target.value) || 0))}
               className="text-xl font-bold tracking-tight h-9 border-0 bg-muted/40 px-2 w-20"
             />
             <div className="flex items-center gap-1.5 mt-1.5">
               <div className={`h-1.5 w-1.5 rounded-full ${bpTier.rate >= 1.0 ? "bg-success" : "bg-warning"}`} />
               <span className="text-[10px] text-muted-foreground">
-                {data.bluepex >= bpSuperMeta
+                {bluepexCount >= bpSuperMeta
                   ? "Super Meta atingida"
-                  : data.bluepex >= bpMeta
+                  : bluepexCount >= bpMeta
                   ? "Meta atingida"
-                  : `Faltam ${bpMeta - data.bluepex} para meta`}
+                  : `Faltam ${bpMeta - bluepexCount} para meta`}
               </span>
             </div>
           </div>
@@ -85,23 +88,23 @@ export function PresentationsCard({ data, globalParams, onChangeBluepex, onChang
           <div>
             <div className="flex items-center gap-2 mb-1">
               <label className="text-[11px] font-semibold text-purple-500">Opus Tech</label>
-              <StatusBadge presentations={data.opus} meta={opMeta} superMeta={opSuperMeta} />
+              <StatusBadge presentations={opusCount} meta={opMeta} superMeta={opSuperMeta} />
             </div>
             <Input
               type="number"
               min={0}
-              value={data.opus}
+              value={opusCount}
               onChange={(e) => onChangeOpus(Math.max(0, parseInt(e.target.value) || 0))}
               className="text-xl font-bold tracking-tight h-9 border-0 bg-muted/40 px-2 w-20"
             />
             <div className="flex items-center gap-1.5 mt-1.5">
               <div className={`h-1.5 w-1.5 rounded-full ${opTier.rate >= 1.0 ? "bg-success" : "bg-warning"}`} />
               <span className="text-[10px] text-muted-foreground">
-                {data.opus >= opSuperMeta
+                {opusCount >= opSuperMeta
                   ? "Super Meta atingida"
-                  : data.opus >= opMeta
+                  : opusCount >= opMeta
                   ? "Meta atingida"
-                  : `Faltam ${opMeta - data.opus} para meta`}
+                  : `Faltam ${opMeta - opusCount} para meta`}
               </span>
             </div>
           </div>

@@ -55,7 +55,7 @@ export default function Index() {
 
   // LOGICA DERIVADA (Somente após os estados)
   const isSingleMonth = dateRange.from.getMonth() === dateRange.to.getMonth() && dateRange.from.getFullYear() === dateRange.to.getFullYear();
-  const currentMonthPres = presentations[selectedMonthKey] || { bluepex: 0, opus: 0 };
+  const currentMonthPres = presentations?.[selectedMonthKey] || { bluepex: 0, opus: 0 };
 
   const handlePeriodChange = (range: DateRange, label: string, type: PeriodType) => {
     setDateRange(range);
