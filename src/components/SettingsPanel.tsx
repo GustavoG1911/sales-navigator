@@ -5,8 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { AppSettings } from "@/lib/types";
 import { formatCurrency } from "@/lib/commission";
-import { seedHistoricalData } from "@/lib/supabase-deals";
-import { Settings2, Save, Database, Loader2 } from "lucide-react";
+import { Settings2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 interface SettingsPanelProps {
@@ -20,7 +19,6 @@ export function SettingsPanel({ settings, onSave, onRefreshDeals }: SettingsPane
   const [commissionRate, setCommissionRate] = useState(((settings.commissionRate || 0.20) * 100).toString());
   const [superMetaThreshold, setSuperMetaThreshold] = useState((settings.superMetaThreshold || 30).toString());
   const [superMetaMultiplier, setSuperMetaMultiplier] = useState(((settings.superMetaMultiplier || 2) * 100).toString());
-  const [seeding, setSeeding] = useState(false);
 
   const handleSave = () => {
     onSave({
@@ -32,19 +30,7 @@ export function SettingsPanel({ settings, onSave, onRefreshDeals }: SettingsPane
     toast.success("Parâmetros salvos com sucesso!");
   };
 
-  const handleSeed = async () => {
-    setSeeding(true);
-    try {
-      const count = await seedHistoricalData();
-      toast.success(`${count} fechamentos históricos inseridos com sucesso!`);
-      onRefreshDeals?.();
-    } catch (err: any) {
-      console.error("Seed error:", err);
-      toast.error("Erro ao popular banco de dados: " + (err.message || "Erro desconhecido"));
-    } finally {
-      setSeeding(false);
-    }
-  };
+
 
   return (
     <div className="max-w-lg mx-auto animate-fade-in space-y-4">
@@ -108,33 +94,7 @@ export function SettingsPanel({ settings, onSave, onRefreshDeals }: SettingsPane
         </CardContent>
       </Card>
 
-      {/* Seed Data Card */}
-      <Card className="glass-card border-warning/30">
-        <CardHeader>
-          <CardTitle className="section-title flex items-center gap-2 text-warning">
-            <Database className="h-5 w-5" />
-            Popular Banco de Dados
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Insere o histórico de 11 fechamentos de 2025 diretamente no banco Supabase. Use apenas uma vez para popular os dados iniciais.
-          </p>
-          <Button onClick={handleSeed} disabled={seeding} variant="outline" className="w-full border-warning/40 text-warning hover:bg-warning/10">
-            {seeding ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Inserindo...
-              </>
-            ) : (
-              <>
-                <Database className="h-4 w-4 mr-2" />
-                Popular Banco de Dados
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+
     </div>
   );
 }
