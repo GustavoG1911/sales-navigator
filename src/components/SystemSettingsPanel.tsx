@@ -11,29 +11,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Users, SlidersHorizontal, Save, Shield, UserCog } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Users, SlidersHorizontal, Save, Shield, UserCog, User } from "lucide-react";
 import { toast } from "sonner";
 
 interface MockUser {
   id: string;
   email: string;
   displayName: string;
-  role: "admin" | "sdr";
+  role: "admin" | "gestor" | "user";
   createdAt: string;
 }
 
 const MOCK_USERS: MockUser[] = [
   { id: "1", email: "admin@dealflow.com", displayName: "Admin Principal", role: "admin", createdAt: "2025-01-15" },
-  { id: "2", email: "joao.silva@dealflow.com", displayName: "João Silva", role: "sdr", createdAt: "2025-02-20" },
-  { id: "3", email: "maria.santos@dealflow.com", displayName: "Maria Santos", role: "sdr", createdAt: "2025-03-10" },
+  { id: "2", email: "joao.silva@dealflow.com", displayName: "João Silva", role: "user", createdAt: "2025-02-20" },
+  { id: "3", email: "maria.santos@dealflow.com", displayName: "Maria Santos", role: "gestor", createdAt: "2025-03-10" },
   { id: "4", email: "pedro.costa@dealflow.com", displayName: "Pedro Costa", role: "admin", createdAt: "2025-04-01" },
 ];
 
@@ -44,7 +37,7 @@ export function SystemSettingsPanel() {
   const [commissionRate, setCommissionRate] = useState("20");
   const [implantationRate, setImplantationRate] = useState("40");
 
-  const handleRoleChange = (userId: string, newRole: "admin" | "sdr") => {
+  const handleRoleChange = (userId: string, newRole: "admin" | "gestor" | "user") => {
     setUsers((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
     );
@@ -97,7 +90,7 @@ export function SystemSettingsPanel() {
                     <TableCell>
                       <Select
                         value={user.role}
-                        onValueChange={(val) => handleRoleChange(user.id, val as "admin" | "sdr")}
+                        onValueChange={(val) => handleRoleChange(user.id, val as "admin" | "gestor" | "user")}
                       >
                         <SelectTrigger className="h-8 text-xs w-[130px]">
                           <SelectValue />
@@ -109,10 +102,16 @@ export function SystemSettingsPanel() {
                               Admin
                             </div>
                           </SelectItem>
-                          <SelectItem value="sdr">
+                          <SelectItem value="gestor">
                             <div className="flex items-center gap-1.5">
-                              <UserCog className="h-3 w-3 text-muted-foreground" />
-                              SDR
+                              <UserCog className="h-3 w-3 text-primary" />
+                              Gestor
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="user">
+                            <div className="flex items-center gap-1.5">
+                              <User className="h-3 w-3 text-muted-foreground" />
+                              User
                             </div>
                           </SelectItem>
                         </SelectContent>

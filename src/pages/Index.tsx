@@ -7,7 +7,6 @@ import { OperationsChart } from "@/components/OperationsChart";
 import { DealsTable } from "@/components/DealsTable";
 import { DealFormDialog } from "@/components/DealFormDialog";
 import { SettingsPanel } from "@/components/SettingsPanel";
-import { ReceivablesFlow } from "@/components/ReceivablesFlow";
 import { PeriodFilter, DateRange, PeriodType } from "@/components/PeriodFilter";
 import { calculateCommission, formatCurrency, getMonthKey, formatMonthLabel, getPresentationsForDeal } from "@/lib/commission";
 import { downloadReportPDF, printReport } from "@/lib/report";
@@ -15,7 +14,7 @@ import { Deal, PaymentStatus, GlobalParameters } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, BarChart3, Receipt } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, BarChart3 } from "lucide-react";
 
 export default function Index() {
   const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, adjustments, updateAdjustment, refreshDeals } = useAppData();
@@ -151,10 +150,6 @@ export default function Index() {
             <BarChart3 className="h-3.5 w-3.5" />
             Dashboard de Vendas
           </TabsTrigger>
-          <TabsTrigger value="receivables" className="text-xs gap-1.5">
-            <Receipt className="h-3.5 w-3.5" />
-            Fluxo de Recebíveis
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-5 mt-0">
@@ -199,19 +194,6 @@ export default function Index() {
             superMetaActive={false}
             onEdit={handleEdit}
             onDelete={removeDeal}
-            onStatusChange={handleStatusChange}
-          />
-        </TabsContent>
-
-        <TabsContent value="receivables" className="mt-0">
-          <ReceivablesFlow
-            allDeals={deals}
-            settings={settings}
-            presentations={presentations}
-            superMeta={superMeta}
-            dateRange={dateRange}
-            adjustments={adjustments}
-            onUpdateAdjustment={updateAdjustment}
             onStatusChange={handleStatusChange}
           />
         </TabsContent>

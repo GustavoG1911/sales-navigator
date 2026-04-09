@@ -27,7 +27,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { title: "Dashboard", url: "/", icon: Home },
-  { title: "Financeiro", url: "/financeiro-gestor", icon: Landmark, roles: ["gestor"] },
+  { title: "Financeiro", url: "/financeiro-gestor", icon: Landmark, roles: ["admin", "gestor"] },
   { title: "Prospecção", url: "/prospeccao", icon: Target, comingSoon: true },
   { title: "Agenda", url: "/agenda", icon: CalendarDays, comingSoon: true },
   { title: "Configurações", url: "/settings", icon: Settings },
