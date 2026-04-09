@@ -37,16 +37,32 @@ const dealToDb = (deal: Partial<Deal>) => ({
 });
 
 export async function fetchDeals(): Promise<Deal[]> {
-  const { data, error } = await supabase
+  let isTestEnv = false;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    isTestEnv = user?.email?.endsWith("@teste.com") || false;
+  } catch (err) {}
+
+  // Busca com filtro de ambiente; se der erro de coluna, faz fallback automático
+  let res = await supabase
     .from("deals")
     .select("*")
+    .eq("is_test_data", isTestEnv)
     .order("closing_date", { ascending: false });
 
-  if (error) {
-    console.error("Error fetching deals:", error);
-    throw error;
+  if (res.error && (res.error.message?.includes("is_test_data") || res.error.message?.includes("column"))) {
+    console.warn("[fetchDeals] Coluna is_test_data não encontrada, buscando tudo.");
+    res = await supabase
+      .from("deals")
+      .select("*")
+      .order("closing_date", { ascending: false });
   }
-  return (data || []).map(dbToDeal);
+
+  if (res.error) {
+    console.error("Error fetching deals:", res.error);
+    throw res.error;
+  }
+  return (res.data || []).map(dbToDeal);
 }
 
 export async function upsertDeal(deal: Deal): Promise<Deal> {
