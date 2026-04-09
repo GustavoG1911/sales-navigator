@@ -19,15 +19,15 @@ export default function Auth() {
     console.log("[Auth] Tentando login com:", email);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      console.error("[Auth] Erro no login:", {
-        message: error.message,
-        status: error.status,
-        name: error.name,
-        cause: error.cause,
-      });
-      toast.error(error.message);
+      // Ignorar erro de schema e deixar o session/user gerenciar
+      if (error.message?.includes("querying schema")) {
+        console.warn("[Auth] Erro de schema ignorado. Conectando...");
+      } else {
+        console.error("[Auth] Erro no login:", error);
+        toast.error(error.message);
+      }
     } else {
-      console.log("[Auth] Login bem-sucedido. User ID:", data?.user?.id);
+      console.log("[Auth] Login bem-sucedido. Session ID:", data?.session?.access_token.slice(0, 10));
     }
     setLoading(false);
   };

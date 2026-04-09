@@ -37,8 +37,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (error) {
-        console.error("[useAuth] Erro ao buscar perfil:", error.message);
+        if (error.message?.includes("querying schema")) {
+          console.warn("[useAuth] Supabase ainda atualizando o schema. Entrando como 'user' por segurança.");
+        } else {
+          console.error("[useAuth] Erro ao buscar perfil:", error.message);
+        }
         setRole("user");
+        setLoading(false);
+        return;
       } else if (data) {
         const dbRole = data.role as any;
         if (dbRole === "admin") setRole("admin");
