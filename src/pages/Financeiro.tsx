@@ -17,8 +17,69 @@ import { formatCurrency, getMonthKey, formatMonthLabel, getPaymentDateInfo, getC
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, ArrowRightLeft } from "lucide-react";
 import { format } from "date-fns";
+
+function FutureProjectionsAccumulatedCard({ projections, role, onSelectMonth }: { projections: any[], role: "user" | "gestor", onSelectMonth: (m: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  
+  const totalIn = projections.reduce((acc, p) => acc + (p.projectedIn || 0), 0);
+  const totalOut = projections.reduce((acc, p) => acc + (p.projectedOut || 0), 0);
+  
+  return (
+    <Card className="mb-6 bg-card overflow-hidden transition-all border border-border/50 shadow-sm">
+      <div 
+        className="p-4 flex flex-col md:flex-row md:items-center justify-between cursor-pointer hover:bg-muted/30 gap-4"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-full shrink-0">
+            <ArrowRightLeft className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold tracking-wide">Acumulado Lançamentos Futuros</h3>
+            <p className="text-xs text-muted-foreground">Previsão total de todos os meses após o atual</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          {role === "user" ? (
+             <span className="font-mono text-emerald-600 font-bold">{formatCurrency(totalIn)}</span>
+          ) : (
+             <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-end md:items-center">
+                <span className="font-mono text-blue-600 text-xs font-semibold">Entradas (In): {formatCurrency(totalIn)}</span>
+                <span className="font-mono text-orange-600 text-xs font-semibold">Saídas (Out): {formatCurrency(totalOut)}</span>
+             </div>
+          )}
+          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
+        </div>
+      </div>
+      
+      {expanded && (
+        <div className="bg-muted/10 border-t border-border/40 p-4">
+          {projections.length === 0 ? (
+             <p className="text-center text-xs text-muted-foreground py-4">Nenhum lançamento previsto bloqueado em meses futuros.</p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+               {projections.map(proj => (
+                 <div key={proj.monthKey} onClick={(e) => { e.stopPropagation(); onSelectMonth(proj.monthKey); }} className="p-3 bg-background rounded-md border border-border/50 cursor-pointer hover:border-primary hover:shadow-sm transition-all">
+                   <p className="font-semibold uppercase tracking-widest text-[10px] mb-1.5 text-muted-foreground">{formatMonthLabel(proj.monthKey)}</p>
+                   {role === "user" ? (
+                     <p className="font-mono text-emerald-600 font-bold text-xs">{formatCurrency(proj.projectedIn)}</p>
+                   ) : (
+                     <div className="flex flex-col gap-1">
+                       <p className="font-mono text-blue-600 font-medium text-[10px] flex justify-between"><span>IN:</span> <span>{formatCurrency(proj.projectedIn)}</span></p>
+                       <p className="font-mono text-orange-600 font-medium text-[10px] flex justify-between"><span>OUT:</span> <span>{formatCurrency(proj.projectedOut)}</span></p>
+                     </div>
+                   )}
+                 </div>
+               ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
 
 interface DealRow {
   id: string;
@@ -99,8 +160,11 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
   const { data, isLoading: loading } = useQuery({
     queryKey: ["user-finance-data", userId],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const isTestEnv = user?.email?.endsWith("@teste.com") || false;
+
       const [dealsRes, salariesRes, profilesRes] = await Promise.all([
-        supabase.from("deals").select("*").eq("user_id", userId).order("closing_date", { ascending: false }),
+        supabase.from("deals").select("*").eq("user_id", userId).eq("is_test_data", isTestEnv).order("closing_date", { ascending: false }),
         supabase.from("salary_payments").select("*").eq("user_id", userId),
         supabase.from("profiles").select("user_id, full_name, display_name, commission_percent").eq("user_id", userId),
       ]);
@@ -210,24 +274,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
         </Select>
       </div>
 
-      {futureProjections.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Lançamentos Futuros</h3>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            {futureProjections.map((proj) => (
-              <Card key={proj.monthKey} className="min-w-[180px] cursor-pointer hover:border-primary transition-colors bg-card/40" onClick={() => setSelectedMonth(proj.monthKey)}>
-                <CardContent className="p-4 flex flex-col gap-2">
-                  <p className="font-semibold text-foreground/90 uppercase tracking-widest text-[11px] mb-1">{formatMonthLabel(proj.monthKey)}</p>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">Comissões a Receber</span>
-                    <span className="font-mono text-emerald-600 font-bold">{formatCurrency(proj.projectedIn)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
+      <FutureProjectionsAccumulatedCard projections={futureProjections} role="user" onSelectMonth={setSelectedMonth} />
 
       <div className="space-y-5">
         <Card>
@@ -354,6 +401,7 @@ function FinanceiroContent() {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [filtroOperacao, setFiltroOperacao] = useState("Todas");
   const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
+  const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [kpiModalType, setKpiModalType] = useState<"volume" | "pago" | "projetado" | "fixo" | null>(null);
   
   const monthOptions = useMemo(() => buildMonthOptions(), []);
@@ -364,10 +412,13 @@ function FinanceiroContent() {
   const { data, isLoading: loading } = useQuery({
     queryKey: ["finance-data"],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const isTestEnv = user?.email?.endsWith("@teste.com") || false;
+
       const [dealsRes, salariesRes, profilesRes, gpRes] = await Promise.all([
-        supabase.from("deals").select("*").order("closing_date", { ascending: false }),
+        supabase.from("deals").select("*").eq("is_test_data", isTestEnv).order("closing_date", { ascending: false }),
         supabase.from("salary_payments").select("*"),
-        supabase.from("profiles").select("user_id, full_name, display_name, commission_percent"),
+        supabase.from("profiles").select("user_id, full_name, display_name, commission_percent").eq("is_test_data", isTestEnv),
         supabase.from("global_parameters").select("*").limit(1).maybeSingle(),
       ]);
 
@@ -407,7 +458,7 @@ function FinanceiroContent() {
       if (baseDate) {
         monthKey = getPaymentDateInfo(baseDate).monthKey;
       } else {
-        monthKey = getMonthKey(d.closing_date); // Tratativa p/ exibir em algum mês sem calcular comissão errada
+        monthKey = getMonthKey(d.closing_date);
       }
       const passMonth = monthKey === selectedMonth;
 
@@ -417,17 +468,29 @@ function FinanceiroContent() {
       // User
       const passUser = filtroFuncionario === "Todos" || d.user_id === filtroFuncionario;
 
-      return passMonth && passOp && passUser;
+      // Status
+      let passStatus = true;
+      if (filtroStatus === "Finalizados") {
+        // Receivables: client paid. Payables: full cycle (paid to user AND SDR confirmed)
+        passStatus = (d.is_mensalidade_paid_by_client || d.is_implantacao_paid_by_client) && d.is_paid_to_user && d.is_user_confirmed_payment;
+      } else if (filtroStatus === "Pendentes") {
+        passStatus = !(d.is_mensalidade_paid_by_client && d.is_paid_to_user && d.is_user_confirmed_payment);
+      }
+
+      return passMonth && passOp && passUser && passStatus;
     });
-  }, [deals, selectedMonth, filtroOperacao, filtroFuncionario]);
+  }, [deals, selectedMonth, filtroOperacao, filtroFuncionario, filtroStatus]);
 
   const filteredSalaries = useMemo(() => {
     return salaries.filter((s) => {
       const passMonth = getMonthKey(s.reference_month) === selectedMonth;
       const passUser = filtroFuncionario === "Todos" || s.user_id === filtroFuncionario;
-      return passMonth && passUser;
+      let passStatus = true;
+      if (filtroStatus === "Finalizados") passStatus = s.is_paid_by_gestor === true;
+      if (filtroStatus === "Pendentes") passStatus = !s.is_paid_by_gestor;
+      return passMonth && passUser && passStatus;
     });
-  }, [salaries, selectedMonth, filtroFuncionario]);
+  }, [salaries, selectedMonth, filtroFuncionario, filtroStatus]);
 
   // KPI Calculations based on filtered lists
   const kpis = useMemo(() => {
@@ -647,6 +710,17 @@ function FinanceiroContent() {
               ))}
             </SelectContent>
           </Select>
+
+          <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+            <SelectTrigger className="w-[140px] md:w-[160px] h-8 text-xs">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Todos">Todos Status</SelectItem>
+              <SelectItem value="Pendentes">🟡 Pendentes</SelectItem>
+              <SelectItem value="Finalizados">✅ Finalizados</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -696,28 +770,9 @@ function FinanceiroContent() {
         </Card>
       </div>
 
-      {futureProjections.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Lançamentos Futuros</h3>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            {futureProjections.map((proj) => (
-              <Card key={proj.monthKey} className="min-w-[200px] cursor-pointer hover:border-primary transition-colors bg-card/40" onClick={() => setSelectedMonth(proj.monthKey)}>
-                <CardContent className="p-4 flex flex-col gap-2">
-                  <p className="font-semibold text-foreground/90 uppercase tracking-widest text-[11px] mb-1">{formatMonthLabel(proj.monthKey)}</p>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">Entradas</span>
-                    <span className="font-mono text-emerald-600">{formatCurrency(proj.projectedIn)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">Saídas</span>
-                    <span className="font-mono text-destructive">{formatCurrency(proj.projectedOut)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
+      </div>
+
+      <FutureProjectionsAccumulatedCard projections={futureProjections} role="gestor" onSelectMonth={setSelectedMonth} />
 
       <Tabs defaultValue="receivables">
         <TabsList className="h-9 mb-5">
@@ -865,6 +920,144 @@ interface ReceivablesTabProps {
   onConfirmInstallment: (id: string, index: number, checked: boolean) => void;
 }
 
+function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: any) {
+  const [expanded, setExpanded] = useState(false);
+  
+  const info = getPaymentDateInfo(deal.first_payment_date || deal.implantation_payment_date || deal.closing_date);
+  const expectedPaymentDateStr = format(new Date(info.expectedPaymentDate + "T12:00:00"), "dd/MM/yyyy");
+  
+  const expectMensalidade = deal.monthly_value > 0 && deal.first_payment_date && getMonthKey(deal.first_payment_date) === selectedMonth;
+  const expectImplantacao = deal.implantation_value > 0 && !deal.is_installment && deal.implantation_payment_date && getMonthKey(deal.implantation_payment_date) === selectedMonth;
+  
+  let isPaid = true;
+  if (expectMensalidade && !deal.is_mensalidade_paid_by_client) isPaid = false;
+  if (expectImplantacao && !deal.is_implantacao_paid_by_client) isPaid = false;
+  if (!expectMensalidade && !expectImplantacao && (!deal.is_installment || deal.installment_count === 0)) isPaid = false;
+
+  const totalValue = (expectMensalidade ? deal.monthly_value : 0) + (expectImplantacao ? deal.implantation_value : 0);
+
+  return (
+    <>
+      <TableRow onClick={() => setExpanded(!expanded)} className="cursor-pointer hover:bg-muted/50 transition-colors">
+        <TableCell className="w-[30px] p-2">
+          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </TableCell>
+        <TableCell className="text-sm font-medium">{getUserName(deal.user_id)}</TableCell>
+        <TableCell className="text-sm">{deal.client_name}</TableCell>
+        <TableCell>
+          <Badge variant="outline" className="text-[10px]">{deal.operation}</Badge>
+        </TableCell>
+        <TableCell className="text-right text-sm font-mono font-semibold text-primary">
+          {formatCurrency(totalValue > 0 ? totalValue : (deal.monthly_value + deal.implantation_value))}
+        </TableCell>
+        <TableCell className="text-sm font-medium text-muted-foreground text-center">
+          {expectedPaymentDateStr}
+        </TableCell>
+        <TableCell className="text-sm text-center">
+          {isPaid ? (
+            <span className="font-medium text-emerald-600/80">Rec. Mês Atual</span>
+          ) : (
+            <span className="text-[11px] text-muted-foreground/60 italic px-2 py-1 bg-muted/30 rounded">A aguardar</span>
+          )}
+        </TableCell>
+        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+          {isPaid ? (
+             <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">Baixa Concluída</Badge>
+          ) : (
+             <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-500/30 bg-yellow-500/10">A Receber</Badge>
+          )}
+        </TableCell>
+      </TableRow>
+      {expanded && (
+        <TableRow className="bg-muted/10">
+          <TableCell colSpan={8} className="p-0">
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 border-b border-border/50">
+              
+              {deal.monthly_value > 0 && deal.first_payment_date && getMonthKey(deal.first_payment_date) === selectedMonth && (
+                <div className="p-3 rounded-md border border-border/60 bg-background space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground">Mensalidade (Ref)</p>
+                      <p className="text-base font-bold">{formatCurrency(deal.monthly_value)}</p>
+                    </div>
+                    {deal.is_mensalidade_paid_by_client ? (
+                      <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
+                        <Check className="h-3 w-3 mr-1" /> Recebido
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] text-yellow-600 bg-yellow-500/10">A Receber</Badge>
+                    )}
+                  </div>
+                  <div className="pt-2 border-t border-border/40 flex justify-between items-center">
+                    <p className="text-[10px] text-muted-foreground">Vencimento Original: {format(new Date(deal.first_payment_date + "T12:00:00"), "dd/MM/yyyy")}</p>
+                    <Button size="sm" variant={deal.is_mensalidade_paid_by_client ? "destructive" : "outline"} className="h-6 text-[10px]" onClick={() => onToggleMensalidade(deal.id, deal.is_mensalidade_paid_by_client || false)}>
+                      {deal.is_mensalidade_paid_by_client ? "Reverter Baixa" : "Confirmar Recebimento"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {deal.implantation_value > 0 && !deal.is_installment && deal.implantation_payment_date && getMonthKey(deal.implantation_payment_date) === selectedMonth && (
+                 <div className="p-3 rounded-md border border-border/60 bg-background space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground">Implantação Única</p>
+                      <p className="text-base font-bold">{formatCurrency(deal.implantation_value)}</p>
+                    </div>
+                    {deal.is_implantacao_paid_by_client ? (
+                      <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
+                        <Check className="h-3 w-3 mr-1" /> Recebido
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] text-yellow-600 bg-yellow-500/10">A Receber</Badge>
+                    )}
+                  </div>
+                  <div className="pt-2 border-t border-border/40 flex justify-between items-center">
+                    <p className="text-[10px] text-muted-foreground">Vencimento Original: {format(new Date(deal.implantation_payment_date + "T12:00:00"), "dd/MM/yyyy")}</p>
+                    <Button size="sm" variant={deal.is_implantacao_paid_by_client ? "destructive" : "outline"} className="h-6 text-[10px]" onClick={() => onToggleImplantacao(deal.id, deal.is_implantacao_paid_by_client || false)}>
+                      {deal.is_implantacao_paid_by_client ? "Reverter Baixa" : "Confirmar Recebimento"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {deal.is_installment && deal.implantation_value > 0 && Array.isArray(deal.installment_dates) && (
+                <div className="p-3 rounded-md border border-border/60 bg-background space-y-2 col-span-full md:col-span-2">
+                  <p className="text-xs font-semibold text-muted-foreground">Parcelas de Implantação ({deal.installment_count}x)</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {deal.installment_dates.map((inst: any, idx: number) => {
+                    const dateStr = inst?.date || inst;
+                    if (!dateStr || getMonthKey(dateStr) !== selectedMonth) return null;
+                    const isPaidInst = inst?.paid === true;
+                    const parcelValue = deal.implantation_value / deal.installment_count;
+                    return (
+                      <div key={idx} className="flex justify-between items-center p-2 rounded bg-muted/30 border border-border/40">
+                         <div>
+                            <p className="text-xs font-medium">Parcela {idx+1}/{deal.installment_count}</p>
+                            <p className="text-sm font-bold">{formatCurrency(parcelValue)}</p>
+                            <p className="text-[10px] text-muted-foreground">Venc: {format(new Date(dateStr + "T12:00:00"), "dd/MM/yyyy")}</p>
+                         </div>
+                         <div className="flex flex-col items-end gap-1">
+                           {isPaidInst ? (
+                              <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[9px] px-1 py-0"><Check className="h-2 w-2 mr-1" /> Recebido</Badge>
+                           ) : <Badge variant="outline" className="text-[9px] px-1 py-0 text-yellow-600">Pendente</Badge>}
+                           <Checkbox checked={isPaidInst} onCheckedChange={(checked) => onConfirmInstallment(deal.id, idx, !!checked)} />
+                         </div>
+                      </div>
+                    )
+                  })}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+}
+
 function ReceivablesTab({ deals, selectedMonth, getUserName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: ReceivablesTabProps) {
   if (deals.length === 0) {
     return (
@@ -878,99 +1071,40 @@ function ReceivablesTab({ deals, selectedMonth, getUserName, onToggleMensalidade
 
   return (
     <div className="space-y-4">
-      {deals.map((deal) => (
-        <Card key={deal.id} className="overflow-hidden">
-          <CardHeader className="py-3 px-4 bg-muted/30">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">
-                {deal.client_name}
-                <Badge variant="outline" className="ml-2 text-[10px]">{deal.operation}</Badge>
-              </CardTitle>
-              <span className="text-xs text-muted-foreground">SDR: {getUserName(deal.user_id)}</span>
-            </div>
-          </CardHeader>
-          <CardContent className="py-3 px-4 space-y-3">
-            {/* Mensalidade */}
-            {deal.monthly_value > 0 && deal.first_payment_date && getMonthKey(deal.first_payment_date) === selectedMonth && (
-              <div className="flex items-center justify-between p-2 rounded-md border border-border/60 bg-background">
-                <div>
-                  <p className="text-xs font-medium">Mensalidade</p>
-                  <p className="text-sm font-bold">{formatCurrency(deal.monthly_value)}</p>
-                  <p className="text-[10px] text-muted-foreground">Venc.: {format(new Date(deal.first_payment_date + "T12:00:00"), "dd/MM/yyyy")}</p>
-                </div>
-                {deal.is_mensalidade_paid_by_client ? (
-                  <Badge 
-                    className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] cursor-pointer hover:bg-emerald-500/20"
-                    onClick={() => onToggleMensalidade(deal.id, true)}
-                  >
-                    <Check className="h-3 w-3 mr-1" /> Recebido
-                  </Badge>
-                ) : (
-                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => onToggleMensalidade(deal.id, false)}>
-                    Confirmar Recebimento
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {/* Implantação */}
-            {deal.implantation_value > 0 && !deal.is_installment && deal.implantation_payment_date && getMonthKey(deal.implantation_payment_date) === selectedMonth && (
-              <div className="flex items-center justify-between p-2 rounded-md border border-border/60 bg-background">
-                <div>
-                  <p className="text-xs font-medium">Implantação</p>
-                  <p className="text-sm font-bold">{formatCurrency(deal.implantation_value)}</p>
-                  <p className="text-[10px] text-muted-foreground">Venc.: {format(new Date(deal.implantation_payment_date + "T12:00:00"), "dd/MM/yyyy")}</p>
-                </div>
-                {deal.is_implantacao_paid_by_client ? (
-                  <Badge 
-                    className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] cursor-pointer hover:bg-emerald-500/20"
-                    onClick={() => onToggleImplantacao(deal.id, true)}
-                  >
-                    <Check className="h-3 w-3 mr-1" /> Recebido
-                  </Badge>
-                ) : (
-                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => onToggleImplantacao(deal.id, false)}>
-                    Confirmar Recebimento
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {/* Parcelas */}
-            {deal.is_installment && deal.implantation_value > 0 && Array.isArray(deal.installment_dates) && (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">Parcelas de Implantação ({deal.installment_count}x)</p>
-                {deal.installment_dates.map((inst: any, idx: number) => {
-                  const dateStr = inst?.date || inst;
-                  if (!dateStr || getMonthKey(dateStr) !== selectedMonth) return null;
-                  const isPaid = inst?.paid === true;
-                  const parcelValue = deal.implantation_value / deal.installment_count;
-                  return (
-                    <div key={idx} className="flex items-center justify-between p-2 rounded-md border border-border/60 bg-background">
-                      <div className="flex items-center gap-3">
-                        <Checkbox
-                          checked={isPaid}
-                          onCheckedChange={(checked) => onConfirmInstallment(deal.id, idx, !!checked)}
-                        />
-                        <div>
-                          <p className="text-xs font-medium">Parcela {idx + 1}/{deal.installment_count}</p>
-                          <p className="text-sm font-bold">{formatCurrency(parcelValue)}</p>
-                          <p className="text-[10px] text-muted-foreground">Venc.: {format(new Date(dateStr + "T12:00:00"), "dd/MM/yyyy")}</p>
-                        </div>
-                      </div>
-                      {isPaid && (
-                        <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
-                          <Check className="h-3 w-3 mr-1" /> Pago
-                        </Badge>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">Contas a Receber (Previsto Mês)</CardTitle>
+        </CardHeader>
+        <CardContent className="px-0 pb-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead className="w-[30px]"></TableHead>
+                <TableHead className="text-[11px]">SDR</TableHead>
+                <TableHead className="text-[11px]">Cliente</TableHead>
+                <TableHead className="text-[11px]">Operação</TableHead>
+                <TableHead className="text-[11px] text-right">Faturamento</TableHead>
+                <TableHead className="text-[11px] text-center">Data Recebimento Previsto</TableHead>
+                <TableHead className="text-[11px] text-center">Data Recebimento Realizado</TableHead>
+                <TableHead className="text-[11px] text-center w-[120px]">Status Operação</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {deals.map((deal) => (
+                <ExpandableReceivablesRow 
+                  key={deal.id}
+                  deal={deal}
+                  selectedMonth={selectedMonth}
+                  getUserName={getUserName}
+                  onToggleMensalidade={onToggleMensalidade}
+                  onToggleImplantacao={onToggleImplantacao}
+                  onConfirmInstallment={onConfirmInstallment}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1035,6 +1169,16 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
         <TableCell className="text-right text-sm font-mono font-semibold text-primary">
           {formatCurrency(dealComiss)}
         </TableCell>
+        <TableCell className="text-sm font-medium text-muted-foreground text-center">
+          {expectedPaymentDateStr}
+        </TableCell>
+        <TableCell className="text-sm text-center">
+          {(deal.actual_payment_date || deal.user_payment_date) ? (
+            <span className="font-medium text-emerald-600/80">{format(new Date((deal.actual_payment_date || deal.user_payment_date) + "T12:00:00"), "dd/MM/yyyy")}</span>
+          ) : (
+            <span className="text-[11px] text-muted-foreground/60 italic px-2 py-1 bg-muted/30 rounded">A aguardar</span>
+          )}
+        </TableCell>
         <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
           <Popover>
             <PopoverTrigger asChild>
@@ -1060,8 +1204,8 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
       
       {expanded && (
         <TableRow className="bg-muted/10">
-          <TableCell colSpan={6} className="p-0">
-            <div className="p-4 grid grid-cols-2 lg:grid-cols-6 gap-4 border-b border-border/50 text-xs">
+          <TableCell colSpan={8} className="p-0">
+            <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-4 border-b border-border/50 text-xs">
               <div className="space-y-1">
                 <p className="text-muted-foreground">Valor Mensalidade</p>
                 <p className="font-mono font-medium">{formatCurrency(deal.monthly_value)}</p>
@@ -1075,16 +1219,8 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
                 <p className="font-mono font-medium">{formatCurrency(baseMonthlyComm + baseImplComm)} <span className="text-[9px] text-muted-foreground">({tier.label})</span></p>
               </div>
               <div className="space-y-1">
-                <p className="text-emerald-600/80">Super Meta</p>
+                <p className="text-emerald-600/80">Bônus Super Meta</p>
                 <p className="font-mono font-medium text-emerald-600">{superMetaBonus > 0 ? "+" + formatCurrency(superMetaBonus) : "—"}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground">Dia de Pagamento Previsto</p>
-                <p className="font-medium text-blue-600/80">{expectedPaymentDateStr}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground">Dia de Pagamento Realizado</p>
-                <p className="font-medium text-emerald-600/80">{(deal.actual_payment_date || deal.user_payment_date) ? format(new Date((deal.actual_payment_date || deal.user_payment_date) + "T12:00:00"), "dd/MM/yyyy") : "A aguardar"}</p>
               </div>
             </div>
           </TableCell>
@@ -1114,7 +1250,9 @@ function PayablesTab({ deals, salaries, profiles, getUserName, presentations, gl
                 <TableHead className="text-[11px]">Cliente</TableHead>
                 <TableHead className="text-[11px]">Operação</TableHead>
                 <TableHead className="text-[11px] text-right">Comissão Total</TableHead>
-                <TableHead className="text-[11px] text-center">Status</TableHead>
+                <TableHead className="text-[11px] text-center">Data Prevista</TableHead>
+                <TableHead className="text-[11px] text-center">Data Realizada</TableHead>
+                <TableHead className="text-[11px] text-center w-[120px]">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -70,9 +70,13 @@ function dealToDb(deal: Deal) {
 }
 
 export async function fetchDeals(): Promise<Deal[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const isTestEnv = user?.email?.endsWith("@teste.com") || false;
+
   const { data, error } = await supabase
     .from("deals" as any)
     .select("*")
+    .eq("is_test_data", isTestEnv)
     .order("closing_date", { ascending: false });
 
   if (error) throw error;
@@ -108,12 +112,16 @@ export async function upsertDeal(deal: Deal): Promise<Deal> {
     const iv = deal.implantationValue || 0;
     const snapshotAmount = (mv * snapshotRate) + (iv * 0.4 * snapshotRate);
 
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const isTestEnv = authUser?.email?.endsWith("@teste.com") || false;
+
     const insertPayload = { 
       ...payload, 
       user_id: userId,
       commission_rate_snapshot: snapshotRate,
       commission_amount_snapshot: snapshotAmount,
-      is_user_confirmed_payment: false
+      is_user_confirmed_payment: false,
+      is_test_data: isTestEnv
     };
 
     const { data, error } = await supabase
