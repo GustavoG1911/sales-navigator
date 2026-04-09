@@ -3,8 +3,9 @@ import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings, ReceivableAd
 import { getPresentations, savePresentations, getSettings, saveSettings, getSuperMeta, saveSuperMeta, getAdjustments, saveAdjustments } from "@/lib/store";
 import { fetchDeals, upsertDeal, deleteDealFromDb } from "@/lib/supabase-deals";
 import { toast } from "sonner";
+import { UserRole } from "./useAuth";
 
-export function useAppData() {
+export function useAppData(role: UserRole = "user", userId?: string) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [presentations, setPresentations] = useState<MonthlyPresentations>(getPresentations);
@@ -14,7 +15,7 @@ export function useAppData() {
 
   const loadDeals = useCallback(async () => {
     try {
-      const data = await fetchDeals();
+      const data = await fetchDeals(role, userId);
       setDeals(data);
     } catch (err: any) {
       console.error("Error fetching deals:", err);
@@ -22,7 +23,7 @@ export function useAppData() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [role, userId]);
 
   useEffect(() => {
     loadDeals();

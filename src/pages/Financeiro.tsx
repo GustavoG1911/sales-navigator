@@ -155,7 +155,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
   
-  const { presentations } = useAppData();
+  const { presentations } = useAppData("user", userId);
 
   const { data, isLoading: loading } = useQuery({
     queryKey: ["user-finance-data", userId],
@@ -404,21 +404,31 @@ function FinanceiroContent() {
   const monthOptions = useMemo(() => buildMonthOptions(), []);
 
   const queryClient = useQueryClient();
-  const { presentations } = useAppData();
+  const { role, user } = useAuth();
+  const { presentations } = useAppData(role, user?.id);
 
   const { data, isLoading: loading } = useQuery({
-    queryKey: ["finance-data"],
+    queryKey: ["finance-data", role, user?.id],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const isTestEnv = user?.email?.endsWith("@teste.com") || false;
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const isTestEnv = currentUser?.email?.endsWith("@teste.com") || false;
 
-      let dealsRes = await supabase.from("deals").select("*").eq("is_test_data", isTestEnv).order("closing_date", { ascending: false });
+      let dealsQuery = supabase.from("deals").select("*").eq("is_test_data", isTestEnv);
+      if (role !== "admin") {
+        dealsQuery = dealsQuery.eq("user_id", user?.id || "no-access-placeholder");
+      }
+
+      let dealsRes = await dealsQuery.order("closing_date", { ascending: false });
       let profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent").eq("is_test_data", isTestEnv);
       const salariesRes = await supabase.from("salary_payments").select("*");
 
       if (dealsRes.error && (dealsRes.error.message.includes('is_test_data') || dealsRes.error.message.includes('column'))) {
         console.warn("[Financeiro] Coluna is_test_data ausente. Executando fallback sem filtro.");
-        dealsRes = await supabase.from("deals").select("*").order("closing_date", { ascending: false });
+        let fallbackQuery = supabase.from("deals").select("*");
+        if (role !== "admin") {
+          fallbackQuery = fallbackQuery.eq("user_id", user?.id || "no-access-placeholder");
+        }
+        dealsRes = await fallbackQuery.order("closing_date", { ascending: false });
         profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent");
       }
 

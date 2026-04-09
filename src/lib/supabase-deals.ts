@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Deal, PaymentStatus } from "./types";
+import { UserRole } from "@/hooks/useAuth";
 
 const dbToDeal = (db: any): Deal => ({
   id: db.id,
@@ -36,22 +37,34 @@ const dealToDb = (deal: Partial<Deal>) => ({
   commission_rate_snapshot: deal.commissionRateSnapshot,
 });
 
-export async function fetchDeals(): Promise<Deal[]> {
+export async function fetchDeals(role: UserRole, userId?: string): Promise<Deal[]> {
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
   
-  console.log(`[fetchDeals] Buscando dados para ambiente: ${isTestEnv ? "TESTE 🧪" : "PRODUÇÃO 🚀"} (User: ${user?.email})`);
+  console.log(`[fetchDeals] Buscando dados para ambiente: ${isTestEnv ? "TESTE 🧪" : "PRODUÇÃO 🚀"} (User: ${user?.email}, Role: ${role})`);
 
-  let res = await supabase
+  let query = supabase
     .from("deals")
     .select("*")
-    .eq("is_test_data", isTestEnv)
-    .order("closing_date", { ascending: false });
+    .eq("is_test_data", isTestEnv);
+
+  // Filtro de segurança: Se não for admin, vê apenas o dele
+  if (role !== "admin") {
+    // Se não for admin, OBRIGATORIAMENTE filtra pelo userId logado
+    // Se userId for nulo por algum motivo, não retorna nada (segurança)
+    query = query.eq("user_id", userId || "no-access-placeholder");
+  }
+
+  let res = await query.order("closing_date", { ascending: false });
 
   if (res.error) {
     console.error("[fetchDeals] Erro na busca principal:", res.error);
     // Fallback: busca sem filtro se der erro de coluna
-    res = await supabase.from("deals").select("*").order("closing_date", { ascending: false });
+    let fallbackQuery = supabase.from("deals").select("*");
+    if (role !== "admin") {
+      fallbackQuery = fallbackQuery.eq("user_id", userId || "no-access-placeholder");
+    }
+    res = await fallbackQuery.order("closing_date", { ascending: false });
   }
 
   console.log(`[fetchDeals] Negócios encontrados: ${res.data?.length || 0}`);
