@@ -13,7 +13,7 @@ import { format } from "date-fns";
 import { DealFormDialog } from "@/components/DealFormDialog";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { PeriodFilter, DateRange, PeriodType } from "@/components/PeriodFilter";
-import { calculateCommission, formatCurrency, getMonthKey, formatMonthLabel, getPresentationsForDeal } from "@/lib/commission";
+import { calculateCommission, formatCurrency, getMonthKey, formatMonthLabel, getPresentationsForDeal, getPaymentDateInfo } from "@/lib/commission";
 import { downloadReportPDF, printReport } from "@/lib/report";
 import { Deal, PaymentStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ export default function Index() {
   const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
   const sdrIdForData = role === "admin" || role === "gestor" ? (filtroFuncionario === "Todos" ? undefined : filtroFuncionario) : user?.id;
   
-  const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment, refreshDeals } = useAppData(role, sdrIdForData);
+  const { deals = [], loading, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, addOrUpdateDeal, removeDeal } = useAppData(role, user?.email);
 
   const currentMonthKey = getMonthKey(new Date());
   const now = new Date();
@@ -94,7 +94,7 @@ export default function Index() {
     () => deals.filter((d) => {
       const baseDate = d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
       const { monthKey } = getPaymentDateInfo(baseDate);
-      const passDate = monthKey === selectedMonthKey; // Aplica a regra financeira real
+      const passDate = monthKey === selectedMonthKey;
 
       if (role === "admin" || role === "gestor") {
         const passOp = filtroOperacao === "Todas" || d.operation === filtroOperacao;

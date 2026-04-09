@@ -12,9 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Upload, Download, ArrowRightLeft, Target, TrendingUp, BadgeDollarSign, Calendar, ChevronDown, ChevronUp, Clock, FileText, CheckCircle2, ArrowDownToLine, ArrowUpFromLine, Check, Loader2, Wallet, Plus, CalendarDays, FileDown, Printer, HelpCircle } from "lucide-react";
+import { DollarSign, Upload, Download, ArrowRightLeft, Target, TrendingUp, BadgeDollarSign, Calendar, ChevronDown, ChevronUp, Clock, FileText, CheckCircle2, ArrowDownToLine, ArrowUpFromLine, Check, Loader2, Wallet, Plus, CalendarDays, FileDown, Printer, HelpCircle, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
-import { formatCurrency, getMonthKey, formatMonthLabel, getPaymentDateInfo, getCommissionTier } from "@/lib/commission";
+import { formatCurrency, getMonthKey, formatMonthLabel, getPaymentDateInfo, getCommissionTier, calculateCommission, getPresentationsForDeal } from "@/lib/commission";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -82,30 +82,7 @@ function FutureProjectionsAccumulatedCard({ projections, role, onSelectMonth }: 
   );
 }
 
-interface DealRow {
-  id: string;
-  client_name: string;
-  operation: string;
-  monthly_value: number;
-  implantation_value: number;
-  closing_date: string;
-  first_payment_date: string | null;
-  implantation_payment_date: string | null;
-  is_installment: boolean;
-  installment_count: number;
-  installment_dates: any;
-  is_mensalidade_paid_by_client: boolean;
-  is_implantacao_paid_by_client: boolean;
-  is_mensalidade_paid: boolean;
-  is_implantacao_paid: boolean;
-  is_commission_liberated: boolean;
-  is_paid_to_user: boolean;
-  user_id: string;
-  payment_status: string;
-  mensalidade_payment_date: string | null;
-  implantacao_payment_date: string | null;
-  user_payment_date?: string | null; // Added
-}
+// Using Deal from @/lib/types.ts
 
 interface SalaryRow {
   id: string;
@@ -153,7 +130,7 @@ export default function Financeiro() {
 
 function UserFinanceiroContent({ userId }: { userId: string }) {
   const { role, user } = useAuth();
-  const { deals = [], loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal, presentations } = useAppData(role, user?.id);
+  const { deals = [], settings, presentations, loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal } = useAppData(role, user?.id);
   const queryClient = useQueryClient();
   const currentMonthKey = getMonthKey(new Date());
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
@@ -162,13 +139,11 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
   const { data, isLoading: loading } = useQuery({
     queryKey: ["user-finance-data", userId],
     queryFn: async () => {
-      const [dealsRes, salariesRes, profilesRes] = await Promise.all([
-        (supabase.from("deals") as any).select("*").eq("user_id", userId).order("closing_date", { ascending: false }),
+      const [salariesRes, profilesRes] = await Promise.all([
         (supabase.from("salary_payments") as any).select("*").eq("user_id", userId),
         (supabase.from("profiles") as any).select("user_id, full_name, display_name, commission_percent, fixed_salary").eq("user_id", userId),
       ]);
 
-      if (dealsRes.error) throw dealsRes.error;
       if (salariesRes.error) throw salariesRes.error;
       if (profilesRes.error) throw profilesRes.error;
 
@@ -183,25 +158,24 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
       });
 
       return {
-        deals: dealsRes.data as any[],
         salaries: salariesRes.data as any[],
         profiles: map,
       };
     }
   });
 
-  const queryDeals = data?.deals || [];
   const querySalaries = data?.salaries || [];
   const profiles = data?.profiles || {};
 
-  const activeDeals = (queryDeals.length > 0 ? queryDeals : deals).filter(d => d.user_id === user?.id);
+  const activeDeals = deals.filter(d => d.userId === user?.id);
   const activeSalaries = querySalaries.length > 0 ? querySalaries : [];
 
   const filteredDeals = useMemo(() => {
     return activeDeals.filter((d) => {
-      const baseDate = d.first_payment_date || d.implantation_payment_date;
-      if (!baseDate) return getMonthKey(d.closing_date) === selectedMonth;
-      return getMonthKey(baseDate) === selectedMonth;
+      const baseDate = d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
+      if (!baseDate) return false;
+      const { monthKey } = getPaymentDateInfo(baseDate);
+      return monthKey === selectedMonth;
     });
   }, [activeDeals, selectedMonth]);
 
@@ -210,58 +184,49 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
   }, [activeSalaries, selectedMonth]);
 
   const payableDeals = useMemo(() => {
-    return filteredDeals.filter((d) => d.is_mensalidade_paid_by_client || d.is_implantacao_paid_by_client);
+    return filteredDeals.filter((d) => d.isMensalidadePaidByClient || d.isImplantacaoPaid);
   }, [filteredDeals]);
 
   const futureProjections = useMemo(() => {
     const projMap: Record<string, { projectedIn: number }> = {};
     activeDeals.forEach((deal) => {
-      const baseDate = deal.first_payment_date || deal.implantation_payment_date;
+      const baseDate = deal.firstPaymentDate || deal.implantationPaymentDate;
       if (!baseDate) return;
+      
       const { monthKey } = getPaymentDateInfo(baseDate);
       if (monthKey > selectedMonth) {
         if (!projMap[monthKey]) projMap[monthKey] = { projectedIn: 0 };
         
-        const commissionRate = deal.commission_rate_snapshot ?? ((profiles[deal.user_id]?.commission_percent || 20) / 100);
-        const baseMonthlyComm = deal.commission_amount_snapshot ? (deal.commission_amount_snapshot * (deal.monthly_value/(deal.monthly_value + (deal.implantation_value*0.4)))) : (deal.monthly_value * commissionRate);
-        const baseImplComm = deal.commission_amount_snapshot ? (deal.commission_amount_snapshot * ((deal.implantation_value*0.4)/(deal.monthly_value + (deal.implantation_value*0.4)))) : ((deal.implantation_value * 0.4) * commissionRate);
+        const presCount = getPresentationsForDeal(deal, presentations);
+        const comm = calculateCommission(deal, presCount, settings, false);
         
-        projMap[monthKey].projectedIn += deal.commission_amount_snapshot ?? (baseMonthlyComm + baseImplComm);
+        projMap[monthKey].projectedIn += comm.totalCommission;
       }
     });
 
     return Object.entries(projMap)
       .map(([key, vals]) => ({ monthKey: key, ...vals }))
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
-  }, [activeDeals, selectedMonth, profiles]);
+  }, [activeDeals, selectedMonth, presentations, settings]);
 
   const kpis = useMemo(() => {
     let projected = 0;
     let paid = 0;
     let volume = 0;
     filteredDeals.forEach((deal) => {
-      volume += (deal.monthly_value + deal.implantation_value);
+      volume += (deal.monthlyValue + deal.implantationValue);
       
-      const presMonth = presentations[selectedMonth] || { bluepex: 0, opus: 0 };
-      const presCount = deal.operation === "BluePex" ? presMonth.bluepex : presMonth.opus;
-      const meta = 15;
-      const smeta = 30;
-      const tier = getCommissionTier(presCount, meta, smeta);
-      const commissionRate = deal.commission_rate_snapshot ?? ((profiles[deal.user_id]?.commission_percent || 20) / 100);
+      const presCount = getPresentationsForDeal(deal, presentations);
+      const comm = calculateCommission(deal, presCount, settings, false);
 
-      const baseMonthlyComm = (deal.monthly_value * Math.min(tier.rate, 1.0)) * commissionRate;
-      const baseImplComm = (deal.implantation_value * 0.4) * commissionRate;
-      const superMetaBonus = tier.rate >= 2.0 ? baseMonthlyComm : 0;
-      const totalDealComm = baseMonthlyComm + baseImplComm + superMetaBonus;
-
-      if (deal.is_paid_to_user) paid += totalDealComm;
-      else projected += totalDealComm;
+      if (deal.isPaidToUser) paid += comm.totalCommission;
+      else projected += comm.totalCommission;
     });
 
     const totalFixo = filteredSalaries.length > 0 ? filteredSalaries.reduce((acc, s) => acc + s.amount, 0) : (profiles[userId]?.fixed_salary || 0);
 
     return { projected, paid, volume, fixed: totalFixo };
-  }, [filteredDeals, filteredSalaries, profiles, userId, selectedMonth, presentations]);
+  }, [filteredDeals, filteredSalaries, userId, selectedMonth, presentations, settings]);
 
   if (loading) {
     return (
@@ -336,30 +301,28 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  payableDeals.map((deal) => {
-                    const commPercent = deal.commission_rate_snapshot ?? ((profiles[deal.user_id]?.commission_percent || 20) / 100);
-                    const mensalComm = deal.is_mensalidade_paid_by_client ? deal.monthly_value * commPercent : 0;
-                    const implComm = deal.is_implantacao_paid_by_client ? deal.implantation_value * 0.4 * commPercent : 0;
-                    const totalDeals = mensalComm + implComm;
+              payableDeals.map((deal) => {
+                    const presCount = getPresentationsForDeal(deal, presentations);
+                    const comm = calculateCommission(deal, presCount, settings, false);
 
                     return (
                       <TableRow key={deal.id}>
-                        <TableCell className="text-sm">{deal.client_name}</TableCell>
+                        <TableCell className="text-sm">{deal.clientName}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[10px]">{deal.operation}</Badge>
                         </TableCell>
                         <TableCell className="text-right text-sm font-mono">
-                          {mensalComm > 0 ? formatCurrency(mensalComm) : "—"}
+                          {deal.isMensalidadePaidByClient ? formatCurrency(comm.monthlyCommission) : "—"}
                         </TableCell>
                         <TableCell className="text-right text-sm font-mono">
-                          {implComm > 0 ? formatCurrency(implComm) : "—"}
+                          {deal.isImplantacaoPaid ? formatCurrency(comm.implantationCommission) : "—"}
                         </TableCell>
                         <TableCell className="text-center">
-                          {deal.is_user_confirmed_payment ? (
+                          {deal.isUserConfirmedPayment ? (
                             <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
                               <Check className="h-3 w-3 mr-1" /> Recebido
                             </Badge>
-                          ) : deal.is_paid_to_user ? (
+                          ) : deal.isPaidToUser ? (
                             <Button size="sm" onClick={() => handleSDRConfirm(deal.id)} className="h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700">
                               Confirmar Recebimento
                             </Button>
@@ -437,7 +400,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
 function FinanceiroContent() {
   const queryClient = useQueryClient();
   const { role, user } = useAuth();
-  const { deals = [], loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal, presentations } = useAppData(role, user?.id);
+  const { deals = [], settings, presentations, loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal } = useAppData(role, user?.id);
 
   const currentMonthKey = getMonthKey(new Date());
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
@@ -457,26 +420,14 @@ function FinanceiroContent() {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const isTestEnv = currentUser?.email?.endsWith("@teste.com") || false;
 
-      let dealsQuery = (supabase.from("deals") as any).select("*").eq("is_test_data", isTestEnv);
-      if (role !== "admin") {
-        dealsQuery = dealsQuery.eq("user_id", user?.id || "no-access-placeholder");
-      }
-
-      let dealsRes = await dealsQuery.order("closing_date", { ascending: false });
       let profilesRes = await (supabase.from("profiles") as any).select("user_id, full_name, display_name, commission_percent, fixed_salary").eq("is_test_data", isTestEnv);
       const salariesRes = await (supabase.from("salary_payments") as any).select("*");
 
-      if (dealsRes.error && (dealsRes.error.message.includes('is_test_data') || dealsRes.error.message.includes('column'))) {
-        console.warn("[Financeiro] Coluna is_test_data ausente. Executando fallback sem filtro.");
-        let fallbackQuery = (supabase.from("deals") as any).select("*");
-        if (role !== "admin") {
-          fallbackQuery = fallbackQuery.eq("user_id", user?.id || "no-access-placeholder");
-        }
-        dealsRes = await fallbackQuery.order("closing_date", { ascending: false });
+      if (profilesRes.error && (profilesRes.error.message.includes('is_test_data') || profilesRes.error.message.includes('column'))) {
+        console.warn("[Financeiro] Fallback de perfis executado.");
         profilesRes = await (supabase.from("profiles") as any).select("user_id, full_name, display_name, commission_percent, fixed_salary");
       }
 
-      if (dealsRes.error) throw dealsRes.error;
       if (profilesRes.error) throw profilesRes.error;
       if (salariesRes.error) throw salariesRes.error;
 
@@ -491,30 +442,27 @@ function FinanceiroContent() {
       });
 
       return {
-        deals: dealsRes.data as any[],
         salaries: salariesRes.data as any[],
         profiles: map,
       };
     }
   });
 
-  const queryDeals = data?.deals || [];
   const querySalaries = data?.salaries || [];
   const profiles = data?.profiles || {};
 
-  const activeDeals = queryDeals.length > 0 ? queryDeals : deals;
+  const activeDeals = deals;
   const activeSalaries = querySalaries.length > 0 ? querySalaries : [];
 
-  // Filter deals relevant to selected month and cross-filters
   const filteredDeals = useMemo(() => {
     return activeDeals.filter((d) => {
       // Time filtering based on filterType
-      const baseDate = d.first_payment_date || d.implantation_payment_date || d.closing_date;
+      const baseDate = d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
       const dateObj = new Date(baseDate);
       
       let passTime = false;
       if (filterType === "month") {
-        const monthKey = baseDate ? getPaymentDateInfo(baseDate).monthKey : getMonthKey(d.closing_date);
+        const { monthKey } = getPaymentDateInfo(baseDate);
         passTime = monthKey === selectedMonth;
       } else {
         passTime = dateObj.getFullYear().toString() === selectedYear;
@@ -524,15 +472,14 @@ function FinanceiroContent() {
       const passOp = filtroOperacao === "Todas" || d.operation === filtroOperacao;
 
       // User
-      const passUser = filtroFuncionario === "Todos" || d.user_id === filtroFuncionario;
+      const passUser = filtroFuncionario === "Todos" || d.userId === filtroFuncionario;
 
       // Status
       let passStatus = true;
       if (filtroStatus === "Finalizados") {
-        // Receivables: client paid. Payables: full cycle (paid to user AND SDR confirmed)
-        passStatus = (d.is_mensalidade_paid_by_client || d.is_implantacao_paid_by_client) && d.is_paid_to_user && d.is_user_confirmed_payment;
+        passStatus = (d.isMensalidadePaidByClient || d.isImplantacaoPaid) && d.isPaidToUser && d.isUserConfirmedPayment;
       } else if (filtroStatus === "Pendentes") {
-        passStatus = !(d.is_mensalidade_paid_by_client && d.is_paid_to_user && d.is_user_confirmed_payment);
+        passStatus = !(d.isMensalidadePaidByClient && d.isPaidToUser && d.isUserConfirmedPayment);
       }
 
       return passTime && passOp && passUser && passStatus;
@@ -557,7 +504,6 @@ function FinanceiroContent() {
     });
   }, [activeSalaries, selectedMonth, filterType, selectedYear, filtroFuncionario, filtroStatus]);
 
-  // KPI Calculations based on filtered lists
   const kpis = useMemo(() => {
     const totalFixo = filteredSalaries.reduce((acc, s) => acc + s.amount, 0);
 
@@ -565,14 +511,10 @@ function FinanceiroContent() {
     let totalPago = 0;
     let volumeTotal = 0;
 
-    const bpMeta = 15;
-    const bpSuperMeta = 30;
-    const opMeta = 15;
-    const opSuperMeta = 30;
-
     activeDeals.forEach((deal) => {
       // Logic for commission calculation
-      const baseDate = deal.first_payment_date || deal.implantation_payment_date || deal.closing_date;
+      const baseDate = deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
+      if (!baseDate) return;
       const { monthKey } = getPaymentDateInfo(baseDate);
       
       // If monthly view, must match selectedMonth
@@ -580,39 +522,28 @@ function FinanceiroContent() {
       // If yearly view, must match selectedYear
       if (filterType === "year" && new Date(baseDate).getFullYear().toString() !== selectedYear) return;
 
-      volumeTotal += deal.monthly_value + deal.implantation_value;
+      volumeTotal += deal.monthlyValue + deal.implantationValue;
 
-      const presMonth = presentations[monthKey] || { bluepex: 0, opus: 0 };
-      const presCount = deal.operation === "BluePex" ? presMonth.bluepex : presMonth.opus;
-      const meta = deal.operation === "BluePex" ? bpMeta : opMeta;
-      const smeta = deal.operation === "BluePex" ? bpSuperMeta : opSuperMeta;
+      const presCount = getPresentationsForDeal(deal, presentations);
+      const comm = calculateCommission(deal, presCount, settings, false);
 
-      const tier = getCommissionTier(presCount, meta, smeta);
-      const commissionRate = deal.commission_rate_snapshot ?? ((profiles[deal.user_id]?.commission_percent || 20) / 100);
-
-      const baseMonthlyComm = (deal.monthly_value * Math.min(tier.rate, 1.0)) * commissionRate;
-      const baseImplComm = (deal.implantation_value * 0.4) * commissionRate;
-      const superMetaBonus = tier.rate >= 2.0 ? baseMonthlyComm : 0;
-
-      const dealComiss = baseMonthlyComm + baseImplComm + superMetaBonus;
-
-      if (deal.is_paid_to_user) {
-        totalPago += dealComiss;
+      if (deal.isPaidToUser) {
+        totalPago += comm.totalCommission;
       } else {
-        totalProjetado += dealComiss;
+        totalProjetado += comm.totalCommission;
       }
     });
 
     return { totalFixo, totalProjetado, totalPago, volumeTotal };
-  }, [filteredDeals, filteredSalaries, selectedMonth, filterType, selectedYear, presentations, profiles]);
+  }, [filteredDeals, filteredSalaries, selectedMonth, filterType, selectedYear, presentations, settings]);
 
   const futureProjections = useMemo(() => {
     const projMap: Record<string, { projectedIn: number, projectedOut: number }> = {};
     activeDeals.forEach((deal) => {
       // Respect user filter for projections
-      if (filtroFuncionario !== "Todos" && deal.user_id !== filtroFuncionario) return;
+      if (filtroFuncionario !== "Todos" && deal.userId !== filtroFuncionario) return;
 
-      const baseDate = deal.first_payment_date || deal.implantation_payment_date;
+      const baseDate = deal.firstPaymentDate || deal.implantationPaymentDate;
       if (!baseDate) return;
       const { monthKey } = getPaymentDateInfo(baseDate);
       
@@ -622,26 +553,12 @@ function FinanceiroContent() {
 
       if (isFuture) {
         if (!projMap[monthKey]) projMap[monthKey] = { projectedIn: 0, projectedOut: 0 };
-        projMap[monthKey].projectedIn += deal.monthly_value + deal.implantation_value;
+        projMap[monthKey].projectedIn += deal.monthlyValue + deal.implantationValue;
 
-        const bpMeta = 15;
-        const bpSuperMeta = 30;
-        const opMeta = 15;
-        const opSuperMeta = 30;
+        const presCount = getPresentationsForDeal(deal, presentations);
+        const comm = calculateCommission(deal, presCount, settings, false);
 
-        const presMonth = presentations[monthKey] || { bluepex: 0, opus: 0 };
-        const presCount = deal.operation === "BluePex" ? presMonth.bluepex : presMonth.opus;
-        const meta = deal.operation === "BluePex" ? bpMeta : opMeta;
-        const smeta = deal.operation === "BluePex" ? bpSuperMeta : opSuperMeta;
-
-        const tier = getCommissionTier(presCount, meta, smeta);
-        const commissionRate = (profiles[deal.user_id]?.commission_percent || 20) / 100;
-
-        const baseMonthlyComm = (deal.monthly_value * Math.min(tier.rate, 1.0)) * commissionRate;
-        const baseImplComm = (deal.implantation_value * 0.4) * commissionRate;
-        const superMetaBonus = tier.rate >= 2.0 ? baseMonthlyComm : 0;
-
-        projMap[monthKey].projectedOut += baseMonthlyComm + baseImplComm + superMetaBonus;
+        projMap[monthKey].projectedOut += comm.totalCommission;
       }
     });
 
@@ -649,11 +566,11 @@ function FinanceiroContent() {
       .map(([key, vals]) => ({ monthKey: key, ...vals }))
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
       .slice(0, 6); // Limita projeção
-  }, [activeDeals, selectedMonth, filterType, selectedYear, presentations, profiles]);
+  }, [activeDeals, selectedMonth, filterType, selectedYear, presentations, settings]);
 
   // Deals with confirmed client payment (ready for payout)
   const payableDeals = useMemo(() => {
-    return filteredDeals.filter((d) => d.is_mensalidade_paid_by_client || d.is_implantacao_paid_by_client);
+    return filteredDeals.filter((d) => d.isMensalidadePaidByClient || d.isImplantacaoPaid);
   }, [filteredDeals]);
 
   const handleToggleMensalidade = async (dealId: string, currentStatus: boolean) => {
@@ -693,7 +610,7 @@ function FinanceiroContent() {
   const handleConfirmInstallment = async (dealId: string, index: number, checked: boolean) => {
     const deal = activeDeals.find((d) => d.id === dealId);
     if (!deal) return;
-    const dates = Array.isArray(deal.installment_dates) ? [...deal.installment_dates] : [];
+    const dates = Array.isArray(deal.installmentDates) ? [...deal.installmentDates] : [];
     if (dates[index]) {
       dates[index] = { ...dates[index], paid: checked };
     }
@@ -900,6 +817,7 @@ function FinanceiroContent() {
             profiles={profiles}
             getUserName={getUserName}
             presentations={presentations}
+            settings={settings}
             onToggleCommissionPayment={handleToggleCommissionPayment}
             onToggleSalaryPayment={handleToggleSalaryPayment}
           />
@@ -955,37 +873,25 @@ function FinanceiroContent() {
                   {filteredDeals
                     .filter((d) => {
                       if (kpiModalType === "volume") return true;
-                      if (kpiModalType === "pago") return d.is_paid_to_user === true;
-                      if (kpiModalType === "projetado") return d.is_paid_to_user === false;
+                      if (kpiModalType === "pago") return d.isPaidToUser === true;
+                      if (kpiModalType === "projetado") return d.isPaidToUser === false;
                       return false;
                     })
                     .map((d) => {
-                      const commRate = d.commission_rate_snapshot ?? ((profiles[d.user_id]?.commission_percent || 20) / 100);
-                      const bpMeta = 15;
-                      const bpSuperMeta = 30;
-                      const opMeta = 15;
-                      const opSuperMeta = 30;
-                      
-                      const monthK = getPaymentDateInfo(d.first_payment_date || d.implantation_payment_date || d.closing_date).monthKey;
-                      const presMonth = presentations[monthK] || { bluepex: 0, opus: 0 };
-                      const presCount = d.operation === "BluePex" ? presMonth.bluepex : presMonth.opus;
-                      const tier = getCommissionTier(presCount, d.operation === "BluePex" ? bpMeta : opMeta, d.operation === "BluePex" ? bpSuperMeta : opSuperMeta);
-                      
-                      const mComm = (d.monthly_value * Math.min(tier.rate, 1.0)) * commRate;
-                      const iComm = (d.implantation_value * 0.4) * commRate;
-                      const sBonus = tier.rate >= 2.0 ? mComm : 0;
-                      const val = d.commission_amount_snapshot ?? (mComm + iComm + sBonus);
+                      const presCount = getPresentationsForDeal(d, presentations);
+                      const comm = calculateCommission(d, presCount, settings, false);
+                      const val = comm.totalCommission;
 
                       return (
                         <TableRow key={d.id}>
-                          <TableCell className="font-medium">{d.client_name}</TableCell>
+                          <TableCell className="font-medium">{d.clientName}</TableCell>
                           <TableCell><Badge variant="outline" className="text-[10px]">{d.operation}</Badge></TableCell>
-                          <TableCell>{getUserName(d.user_id)}</TableCell>
+                          <TableCell>{getUserName(d.userId)}</TableCell>
                           <TableCell className="text-right font-mono text-primary font-medium">{formatCurrency(val)}</TableCell>
                           <TableCell className="text-center">
-                            {d.is_user_confirmed_payment ? (
+                            {d.isUserConfirmedPayment ? (
                               <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">Recebido (SDR)</Badge>
-                            ) : d.is_paid_to_user ? (
+                            ) : d.isPaidToUser ? (
                               <Badge variant="outline" className="text-[10px] text-orange-600 border-orange-500/30 bg-orange-500/10">Aguardando SDR</Badge>
                             ) : (
                               <Badge variant="outline" className="text-[10px]">Pendente</Badge>
@@ -1007,7 +913,7 @@ function FinanceiroContent() {
 /* ── Contas a Receber ── */
 
 interface ReceivablesTabProps {
-  deals: DealRow[];
+  deals: Deal[];
   selectedMonth: string;
   getUserName: (id: string) => string;
   onToggleMensalidade: (id: string, currentStatus: boolean) => void;
@@ -1018,18 +924,20 @@ interface ReceivablesTabProps {
 function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: any) {
   const [expanded, setExpanded] = useState(false);
   
-  const info = getPaymentDateInfo(deal.first_payment_date || deal.implantation_payment_date || deal.closing_date);
+  const dateForInfo = deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
+  if (!dateForInfo) return null;
+  const info = getPaymentDateInfo(dateForInfo);
   const expectedPaymentDateStr = format(new Date(info.expectedPaymentDate + "T12:00:00"), "dd/MM/yyyy");
   
-  const expectMensalidade = deal.monthly_value > 0 && deal.first_payment_date && getMonthKey(deal.first_payment_date) === selectedMonth;
-  const expectImplantacao = deal.implantation_value > 0 && !deal.is_installment && deal.implantation_payment_date && getMonthKey(deal.implantation_payment_date) === selectedMonth;
+  const expectMensalidade = deal.monthlyValue > 0 && deal.firstPaymentDate && getMonthKey(deal.firstPaymentDate) === selectedMonth;
+  const expectImplantacao = deal.implantationValue > 0 && !deal.isInstallment && deal.implantationPaymentDate && getMonthKey(deal.implantationPaymentDate) === selectedMonth;
   
   let isPaid = true;
-  if (expectMensalidade && !deal.is_mensalidade_paid_by_client) isPaid = false;
-  if (expectImplantacao && !deal.is_implantacao_paid_by_client) isPaid = false;
-  if (!expectMensalidade && !expectImplantacao && (!deal.is_installment || deal.installment_count === 0)) isPaid = false;
+  if (expectMensalidade && !deal.isMensalidadePaidByClient) isPaid = false;
+  if (expectImplantacao && !deal.isImplantacaoPaid) isPaid = false;
+  if (!expectMensalidade && !expectImplantacao && (!deal.isInstallment || deal.installmentCount === 0)) isPaid = false;
 
-  const totalValue = (expectMensalidade ? deal.monthly_value : 0) + (expectImplantacao ? deal.implantation_value : 0);
+  const totalValue = (expectMensalidade ? deal.monthlyValue : 0) + (expectImplantacao ? deal.implantationValue : 0);
 
   return (
     <>
@@ -1037,13 +945,13 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMe
         <TableCell className="w-[30px] p-2">
           {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
         </TableCell>
-        <TableCell className="text-sm font-medium">{getUserName(deal.user_id)}</TableCell>
-        <TableCell className="text-sm">{deal.client_name}</TableCell>
+        <TableCell className="text-sm font-medium">{getUserName(deal.userId)}</TableCell>
+        <TableCell className="text-sm">{deal.clientName}</TableCell>
         <TableCell>
           <Badge variant="outline" className="text-[10px]">{deal.operation}</Badge>
         </TableCell>
         <TableCell className="text-right text-sm font-mono font-semibold text-primary">
-          {formatCurrency(totalValue > 0 ? totalValue : (deal.monthly_value + deal.implantation_value))}
+          {formatCurrency(totalValue > 0 ? totalValue : (deal.monthlyValue + deal.implantationValue))}
         </TableCell>
         <TableCell className="text-sm font-medium text-muted-foreground text-center">
           {expectedPaymentDateStr}
@@ -1068,14 +976,14 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMe
           <TableCell colSpan={8} className="p-0">
             <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 border-b border-border/50">
               
-              {deal.monthly_value > 0 && deal.first_payment_date && getMonthKey(deal.first_payment_date) === selectedMonth && (
+              {deal.monthlyValue > 0 && deal.firstPaymentDate && getMonthKey(deal.firstPaymentDate) === selectedMonth && (
                 <div className="p-3 rounded-md border border-border/60 bg-background space-y-2">
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="text-xs font-semibold text-muted-foreground">Mensalidade (Ref)</p>
-                      <p className="text-base font-bold">{formatCurrency(deal.monthly_value)}</p>
+                      <p className="text-base font-bold">{formatCurrency(deal.monthlyValue)}</p>
                     </div>
-                    {deal.is_mensalidade_paid_by_client ? (
+                    {deal.isMensalidadePaidByClient ? (
                       <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
                         <Check className="h-3 w-3 mr-1" /> Recebido
                       </Badge>
@@ -1084,22 +992,22 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMe
                     )}
                   </div>
                   <div className="pt-2 border-t border-border/40 flex justify-between items-center">
-                    <p className="text-[10px] text-muted-foreground">Vencimento Original: {format(new Date(deal.first_payment_date + "T12:00:00"), "dd/MM/yyyy")}</p>
-                    <Button size="sm" variant={deal.is_mensalidade_paid_by_client ? "destructive" : "outline"} className="h-6 text-[10px]" onClick={() => onToggleMensalidade(deal.id, deal.is_mensalidade_paid_by_client || false)}>
-                      {deal.is_mensalidade_paid_by_client ? "Reverter Baixa" : "Confirmar Recebimento"}
+                    <p className="text-[10px] text-muted-foreground">Vencimento Original: {format(new Date(deal.firstPaymentDate + "T12:00:00"), "dd/MM/yyyy")}</p>
+                    <Button size="sm" variant={deal.isMensalidadePaidByClient ? "destructive" : "outline"} className="h-6 text-[10px]" onClick={() => onToggleMensalidade(deal.id, deal.isMensalidadePaidByClient || false)}>
+                      {deal.isMensalidadePaidByClient ? "Reverter Baixa" : "Confirmar Recebimento"}
                     </Button>
                   </div>
                 </div>
               )}
 
-              {deal.implantation_value > 0 && !deal.is_installment && deal.implantation_payment_date && getMonthKey(deal.implantation_payment_date) === selectedMonth && (
+              {deal.implantationValue > 0 && !deal.isInstallment && deal.implantationPaymentDate && getMonthKey(deal.implantationPaymentDate) === selectedMonth && (
                  <div className="p-3 rounded-md border border-border/60 bg-background space-y-2">
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="text-xs font-semibold text-muted-foreground">Implantação Única</p>
-                      <p className="text-base font-bold">{formatCurrency(deal.implantation_value)}</p>
+                      <p className="text-base font-bold">{formatCurrency(deal.implantationValue)}</p>
                     </div>
-                    {deal.is_implantacao_paid_by_client ? (
+                    {deal.isImplantacaoPaid ? (
                       <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
                         <Check className="h-3 w-3 mr-1" /> Recebido
                       </Badge>
@@ -1108,27 +1016,27 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMe
                     )}
                   </div>
                   <div className="pt-2 border-t border-border/40 flex justify-between items-center">
-                    <p className="text-[10px] text-muted-foreground">Vencimento Original: {format(new Date(deal.implantation_payment_date + "T12:00:00"), "dd/MM/yyyy")}</p>
-                    <Button size="sm" variant={deal.is_implantacao_paid_by_client ? "destructive" : "outline"} className="h-6 text-[10px]" onClick={() => onToggleImplantacao(deal.id, deal.is_implantacao_paid_by_client || false)}>
-                      {deal.is_implantacao_paid_by_client ? "Reverter Baixa" : "Confirmar Recebimento"}
+                    <p className="text-[10px] text-muted-foreground">Vencimento Original: {format(new Date(deal.implantationPaymentDate + "T12:00:00"), "dd/MM/yyyy")}</p>
+                    <Button size="sm" variant={deal.isImplantacaoPaid ? "destructive" : "outline"} className="h-6 text-[10px]" onClick={() => onToggleImplantacao(deal.id, deal.isImplantacaoPaid || false)}>
+                      {deal.isImplantacaoPaid ? "Reverter Baixa" : "Confirmar Recebimento"}
                     </Button>
                   </div>
                 </div>
               )}
 
-              {deal.is_installment && deal.implantation_value > 0 && Array.isArray(deal.installment_dates) && (
+              {deal.isInstallment && deal.implantationValue > 0 && Array.isArray(deal.installmentDates) && (
                 <div className="p-3 rounded-md border border-border/60 bg-background space-y-2 col-span-full md:col-span-2">
-                  <p className="text-xs font-semibold text-muted-foreground">Parcelas de Implantação ({deal.installment_count}x)</p>
+                  <p className="text-xs font-semibold text-muted-foreground">Parcelas de Implantação ({deal.installmentCount}x)</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {deal.installment_dates.map((inst: any, idx: number) => {
+                  {deal.installmentDates.map((inst: any, idx: number) => {
                     const dateStr = inst?.date || inst;
                     if (!dateStr || getMonthKey(dateStr) !== selectedMonth) return null;
                     const isPaidInst = inst?.paid === true;
-                    const parcelValue = deal.implantation_value / deal.installment_count;
+                    const parcelValue = deal.implantationValue / deal.installmentCount;
                     return (
                       <div key={idx} className="flex justify-between items-center p-2 rounded bg-muted/30 border border-border/40">
                          <div>
-                            <p className="text-xs font-medium">Parcela {idx+1}/{deal.installment_count}</p>
+                            <p className="text-xs font-medium">Parcela {idx+1}/{deal.installmentCount}</p>
                             <p className="text-sm font-bold">{formatCurrency(parcelValue)}</p>
                             <p className="text-[10px] text-muted-foreground">Venc: {format(new Date(dateStr + "T12:00:00"), "dd/MM/yyyy")}</p>
                          </div>
@@ -1207,47 +1115,31 @@ function ReceivablesTab({ deals, selectedMonth, getUserName, onToggleMensalidade
 /* ── Contas a Pagar ── */
 
 interface PayablesTabProps {
-  deals: DealRow[];
+  deals: Deal[];
   salaries: SalaryRow[];
   profiles: ProfileMap;
   getUserName: (id: string) => string;
   presentations: any;
+  settings: any;
   onToggleCommissionPayment: (dealId: string, currentStatus: boolean, specificDate?: string) => void;
   onToggleSalaryPayment: (salaryId: string, currentStatus: boolean) => void;
 }
 
-function ExpandableCommissionRow({ deal, profile, getUserName, presentations, onToggleCommissionPayment }: any) {
+function ExpandableCommissionRow({ deal, settings, getUserName, presentations, onToggleCommissionPayment }: any) {
   const [expanded, setExpanded] = useState(false);
-  const [payDate, setPayDate] = useState(deal.user_payment_date ? deal.user_payment_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
+  const [payDate, setPayDate] = useState(deal.userPaymentDate ? deal.userPaymentDate.slice(0, 10) : new Date().toISOString().slice(0, 10));
 
-  const baseDate = deal.first_payment_date || deal.implantation_payment_date;
-  let monthKey = getMonthKey(deal.closing_date);
+  const baseDate = deal.firstPaymentDate || deal.implantationPaymentDate;
   let expectedPaymentDateStr = "Data Pendente";
 
   if (baseDate) {
     const info = getPaymentDateInfo(baseDate);
-    monthKey = info.monthKey;
     expectedPaymentDateStr = format(new Date(info.expectedPaymentDate + "T12:00:00"), "dd/MM/yyyy");
   }
 
-  const bpMeta = 15;
-  const bpSuperMeta = 30;
-  const opMeta = 15;
-  const opSuperMeta = 30;
-
-  const presMonth = presentations[monthKey] || { bluepex: 0, opus: 0 };
-  const presCount = deal.operation === "BluePex" ? presMonth.bluepex : presMonth.opus;
-  const meta = deal.operation === "BluePex" ? bpMeta : opMeta;
-  const smeta = deal.operation === "BluePex" ? bpSuperMeta : opSuperMeta;
-
-  const tier = getCommissionTier(presCount, meta, smeta);
-  const commissionRate = deal.commission_rate_snapshot ?? ((profile?.commission_percent || 20) / 100);
-
-  const baseMonthlyComm = Math.round((deal.monthly_value * Math.min(tier.rate, 1.0)) * commissionRate * 100) / 100;
-  const baseImplComm = Math.round((deal.implantation_value * 0.4) * commissionRate * 100) / 100;
-  const superMetaBonus = tier.rate >= 2.0 ? baseMonthlyComm : 0;
-  // Fallback: se for dado legado sem data, ele mapeia a linha mas zera comissão pra evitar erro.
-  const dealComiss = deal.commission_amount_snapshot ?? (baseDate ? baseMonthlyComm + baseImplComm + superMetaBonus : 0);
+  const presCount = getPresentationsForDeal(deal, presentations);
+  const comm = calculateCommission(deal, presCount, settings, false);
+  const dealComiss = comm.totalCommission;
 
   return (
     <>
@@ -1255,8 +1147,8 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, on
         <TableCell className="w-[30px] p-2">
           {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
         </TableCell>
-        <TableCell className="text-sm font-medium">{getUserName(deal.user_id)}</TableCell>
-        <TableCell className="text-sm">{deal.client_name}</TableCell>
+        <TableCell className="text-sm font-medium">{getUserName(deal.userId)}</TableCell>
+        <TableCell className="text-sm">{deal.clientName}</TableCell>
         <TableCell>
           <Badge variant="outline" className="text-[10px]">{deal.operation}</Badge>
         </TableCell>
@@ -1267,8 +1159,8 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, on
           {expectedPaymentDateStr}
         </TableCell>
         <TableCell className="text-sm text-center">
-          {(deal.actual_payment_date || deal.user_payment_date) ? (
-            <span className="font-medium text-emerald-600/80">{format(new Date((deal.actual_payment_date || deal.user_payment_date) + "T12:00:00"), "dd/MM/yyyy")}</span>
+          {deal.userPaymentDate ? (
+            <span className="font-medium text-emerald-600/80">{format(new Date(deal.userPaymentDate + "T12:00:00"), "dd/MM/yyyy")}</span>
           ) : (
             <span className="text-[11px] text-muted-foreground/60 italic px-2 py-1 bg-muted/30 rounded">A aguardar</span>
           )}
@@ -1276,8 +1168,8 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, on
         <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
           <Popover>
             <PopoverTrigger asChild>
-              <Button size="sm" variant={deal.is_user_confirmed_payment ? "outline" : "default"} className={`h-7 text-xs ${deal.is_user_confirmed_payment ? 'text-emerald-600 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20' : deal.is_paid_to_user ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
-                {deal.is_user_confirmed_payment ? "Pago (Confirmado)" : deal.is_paid_to_user ? "Aguardando SDR" : "Dar Baixa"}
+              <Button size="sm" variant={deal.isUserConfirmedPayment ? "outline" : "default"} className={`h-7 text-xs ${deal.isUserConfirmedPayment ? 'text-emerald-600 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20' : deal.isPaidToUser ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                {deal.isUserConfirmedPayment ? "Pago (Confirmado)" : deal.isPaidToUser ? "Aguardando SDR" : "Dar Baixa"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-64 p-3 shadow-lg" align="end">
@@ -1287,8 +1179,8 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, on
                   <label className="text-[11px] text-muted-foreground">Data da Baixa Realizada</label>
                   <Input type="date" className="h-8 text-xs" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
                 </div>
-                <Button size="sm" className={`w-full h-8 text-xs text-white ${deal.is_paid_to_user ? 'bg-destructive hover:bg-destructive/90' : 'bg-emerald-600 hover:bg-emerald-700'}`} onClick={() => onToggleCommissionPayment(deal.id, deal.is_paid_to_user || false, payDate)}>
-                  {deal.is_paid_to_user ? "Remover Baixa" : "Confirmar Recebido"}
+                <Button size="sm" className={`w-full h-8 text-xs text-white ${deal.isPaidToUser ? 'bg-destructive hover:bg-destructive/90' : 'bg-emerald-600 hover:bg-emerald-700'}`} onClick={() => onToggleCommissionPayment(deal.id, deal.isPaidToUser || false, payDate)}>
+                  {deal.isPaidToUser ? "Remover Baixa" : "Confirmar Recebido"}
                 </Button>
               </div>
             </PopoverContent>
@@ -1302,19 +1194,19 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, on
             <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-4 border-b border-border/50 text-xs">
               <div className="space-y-1">
                 <p className="text-muted-foreground">Valor Mensalidade</p>
-                <p className="font-mono font-medium">{formatCurrency(deal.monthly_value)}</p>
+                <p className="font-mono font-medium">{formatCurrency(deal.monthlyValue)}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground">Valor Implantação</p>
-                <p className="font-mono font-medium">{formatCurrency(deal.implantation_value)}</p>
+                <p className="font-mono font-medium">{formatCurrency(deal.implantationValue)}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground">Comissão Base</p>
-                <p className="font-mono font-medium">{formatCurrency(baseMonthlyComm + baseImplComm)} <span className="text-[9px] text-muted-foreground">({tier.label})</span></p>
+                <p className="font-mono font-medium">{formatCurrency(comm.monthlyCommission + comm.implantationCommission)}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-emerald-600/80">Bônus Super Meta</p>
-                <p className="font-mono font-medium text-emerald-600">{superMetaBonus > 0 ? "+" + formatCurrency(superMetaBonus) : "—"}</p>
+                <p className="font-mono font-medium text-emerald-600">{comm.superMetaBonus > 0 ? "+" + formatCurrency(comm.superMetaBonus) : "—"}</p>
               </div>
             </div>
           </TableCell>
@@ -1324,7 +1216,7 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, on
   );
 }
 
-function PayablesTab({ deals, salaries, profiles, getUserName, presentations, onToggleCommissionPayment, onToggleSalaryPayment }: PayablesTabProps) {
+function PayablesTab({ deals, salaries, profiles, getUserName, presentations, settings, onToggleCommissionPayment, onToggleSalaryPayment }: PayablesTabProps) {
   return (
     <div className="space-y-5">
       {/* Commissions */}
@@ -1361,7 +1253,7 @@ function PayablesTab({ deals, salaries, profiles, getUserName, presentations, on
                   <ExpandableCommissionRow 
                     key={deal.id}
                     deal={deal}
-                    profile={profiles[deal.user_id]}
+                    settings={settings}
                     getUserName={getUserName}
                     presentations={presentations}
                     onToggleCommissionPayment={onToggleCommissionPayment}
