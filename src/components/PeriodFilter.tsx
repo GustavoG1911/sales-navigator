@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -17,6 +17,7 @@ export interface DateRange {
 
 interface PeriodFilterProps {
   onPeriodChange: (range: DateRange, label: string, periodType: PeriodType) => void;
+  availableYears?: number[];
 }
 
 function getMonthRange(year: number, month: number): DateRange {
@@ -71,15 +72,25 @@ const yearOptions = [currentYear - 1, currentYear].map((y) => ({
   range: getYearRange(y),
 }));
 
-export function PeriodFilter({ onPeriodChange }: PeriodFilterProps) {
+export function PeriodFilter({ onPeriodChange, availableYears = [] }: PeriodFilterProps) {
   const [periodType, setPeriodType] = useState<PeriodType>("month");
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
   const [customTo, setCustomTo] = useState<Date | undefined>();
 
   const currentKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
 
+  // Gera opções de ano dinâmicas
+  const dynamicYearOptions = useMemo(() => {
+    const years = availableYears.length > 0 ? availableYears : [currentYear - 1, currentYear];
+    return years.map((y) => ({
+      value: `Y-${y}`,
+      label: `Ano ${y}`,
+      range: getYearRange(y),
+    }));
+  }, [availableYears]);
+
   const handlePresetChange = (value: string) => {
-    const allOptions = [...monthOptions, ...quarterOptions, ...yearOptions];
+    const allOptions = [...monthOptions, ...quarterOptions, ...dynamicYearOptions];
     const opt = allOptions.find((o) => o.value === value);
     if (opt) onPeriodChange(opt.range, opt.label, periodType);
   };
@@ -106,7 +117,7 @@ export function PeriodFilter({ onPeriodChange }: PeriodFilterProps) {
           else if (newType === "year") defaultValue = `Y-${currentYear}`;
           
           if (defaultValue) {
-            const allOptions = [...monthOptions, ...quarterOptions, ...yearOptions];
+            const allOptions = [...monthOptions, ...quarterOptions, ...dynamicYearOptions];
             const opt = allOptions.find((o) => o.value === defaultValue);
             if (opt) onPeriodChange(opt.range, opt.label, newType);
           }
@@ -150,12 +161,15 @@ export function PeriodFilter({ onPeriodChange }: PeriodFilterProps) {
       )}
 
       {periodType === "year" && (
-        <Select onValueChange={handlePresetChange}>
+        <Select 
+          defaultValue={dynamicYearOptions.some(o => o.value === `Y-${currentYear}`) ? `Y-${currentYear}` : dynamicYearOptions[0]?.value} 
+          onValueChange={handlePresetChange}
+        >
           <SelectTrigger className="w-[140px] h-9 text-sm">
             <SelectValue placeholder="Selecionar ano" />
           </SelectTrigger>
           <SelectContent>
-            {yearOptions.map((o) => (
+            {dynamicYearOptions.map((o) => (
               <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
             ))}
           </SelectContent>

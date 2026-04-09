@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useAppData } from "@/hooks/useAppData";
 import { useAuth } from "@/hooks/useAuth";
+import { fetchAvailableYears } from "@/lib/supabase-deals";
 import { KpiCard } from "@/components/KpiCard";
 import { PresentationsCard } from "@/components/PresentationsCard";
 import { OperationsChart } from "@/components/OperationsChart";
@@ -41,6 +42,7 @@ export default function Index() {
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   
   const [kpiModalType, setKpiModalType] = useState<"projected" | "paid" | "deals" | null>(null);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
 
   const periodSuffix = periodType === "month" ? "do Mês" : periodType === "quarter" ? "do Trimestre" : periodType === "year" ? "do Ano" : "do Período";
 
@@ -65,6 +67,10 @@ export default function Index() {
       });
     }
   }, [role]);
+
+  useEffect(() => {
+    fetchAvailableYears(user?.email || "").then(setAvailableYears);
+  }, [user?.email]);
 
   const filteredDeals = useMemo(
     () => deals.filter((d) => {
@@ -211,7 +217,7 @@ export default function Index() {
           {(role === "admin" || role === "gestor") && (
             <Card className="bg-muted/30">
               <CardContent className="p-4 flex flex-wrap items-center gap-4">
-                <PeriodFilter onPeriodChange={handlePeriodChange} />
+                <PeriodFilter onPeriodChange={handlePeriodChange} availableYears={availableYears} />
                 <Select value={filtroOperacao} onValueChange={setFiltroOperacao}>
                   <SelectTrigger className="w-[140px] md:w-[160px] h-9 text-xs font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
                     <SelectValue placeholder="Operação" />

@@ -89,3 +89,30 @@ export async function deleteDealFromDb(id: string): Promise<void> {
   const { error } = await supabase.from("deals").delete().eq("id", id);
   if (error) throw error;
 }
+
+export async function fetchAvailableYears(email: string): Promise<number[]> {
+  const isTestEnv = email.endsWith("@teste.com");
+  const { data, error } = await supabase
+    .from("deals")
+    .select("closing_date")
+    .eq("is_test_data", isTestEnv);
+
+  if (error) {
+    console.error("Error fetching available years:", error);
+    return [new Date().getFullYear()];
+  }
+
+  const years = new Set<number>();
+  data?.forEach((d) => {
+    if (d.closing_date) {
+      years.add(new Date(d.closing_date).getFullYear());
+    }
+  });
+
+  // Fallback to current year if empty
+  if (years.size === 0) {
+    years.add(new Date().getFullYear());
+  }
+
+  return Array.from(years).sort((a, b) => b - a);
+}
