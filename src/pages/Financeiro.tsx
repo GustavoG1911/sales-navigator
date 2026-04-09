@@ -17,6 +17,7 @@ import { formatCurrency, getMonthKey, formatMonthLabel, getPaymentDateInfo, getC
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { format } from "date-fns";
 
 interface DealRow {
   id: string;
@@ -269,7 +270,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                         <Badge variant="secondary" className="text-[9px] uppercase">BDtech</Badge>
                       </TableCell>
                       <TableCell className="text-right text-sm font-mono">{formatCurrency(s.amount)}</TableCell>
-                      <TableCell className="text-sm">{new Date(s.expected_payment_date + "T12:00:00").toLocaleDateString("pt-BR")}</TableCell>
+                      <TableCell className="text-sm">{format(new Date(s.expected_payment_date + "T12:00:00"), "dd/MM/yyyy")}</TableCell>
                       <TableCell className="text-center">
                         {s.is_paid_by_gestor ? (
                             <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
@@ -665,7 +666,7 @@ function ReceivablesTab({ deals, selectedMonth, getUserName, onConfirmMensalidad
                 <div>
                   <p className="text-xs font-medium">Mensalidade</p>
                   <p className="text-sm font-bold">{formatCurrency(deal.monthly_value)}</p>
-                  <p className="text-[10px] text-muted-foreground">Venc.: {new Date(deal.first_payment_date + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+                  <p className="text-[10px] text-muted-foreground">Venc.: {format(new Date(deal.first_payment_date + "T12:00:00"), "dd/MM/yyyy")}</p>
                 </div>
                 {deal.is_mensalidade_paid_by_client ? (
                   <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
@@ -685,7 +686,7 @@ function ReceivablesTab({ deals, selectedMonth, getUserName, onConfirmMensalidad
                 <div>
                   <p className="text-xs font-medium">Implantação</p>
                   <p className="text-sm font-bold">{formatCurrency(deal.implantation_value)}</p>
-                  <p className="text-[10px] text-muted-foreground">Venc.: {new Date(deal.implantation_payment_date + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+                  <p className="text-[10px] text-muted-foreground">Venc.: {format(new Date(deal.implantation_payment_date + "T12:00:00"), "dd/MM/yyyy")}</p>
                 </div>
                 {deal.is_implantacao_paid_by_client ? (
                   <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
@@ -718,7 +719,7 @@ function ReceivablesTab({ deals, selectedMonth, getUserName, onConfirmMensalidad
                         <div>
                           <p className="text-xs font-medium">Parcela {idx + 1}/{deal.installment_count}</p>
                           <p className="text-sm font-bold">{formatCurrency(parcelValue)}</p>
-                          <p className="text-[10px] text-muted-foreground">Venc.: {new Date(dateStr + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+                          <p className="text-[10px] text-muted-foreground">Venc.: {format(new Date(dateStr + "T12:00:00"), "dd/MM/yyyy")}</p>
                         </div>
                       </div>
                       {isPaid && (
@@ -762,7 +763,7 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
   if (baseDate) {
     const info = getPaymentDateInfo(baseDate);
     monthKey = info.monthKey;
-    expectedPaymentDateStr = new Date(info.expectedPaymentDate + "T12:00:00").toLocaleDateString("pt-BR");
+    expectedPaymentDateStr = format(new Date(info.expectedPaymentDate + "T12:00:00"), "dd/MM/yyyy");
   }
 
   const bpMeta = globalParams?.meta_apresentacoes_bluepex || 15;
@@ -847,7 +848,7 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground">Data Realizada</p>
-                <p className="font-medium text-emerald-600/80">{deal.user_payment_date ? new Date(deal.user_payment_date + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</p>
+                <p className="font-medium text-emerald-600/80">{deal.user_payment_date ? format(new Date(deal.user_payment_date + "T12:00:00"), "dd/MM/yyyy") : "—"}</p>
               </div>
             </div>
           </TableCell>

@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Plus, DollarSign, TrendingUp, BadgeDollarSign, CalendarDays, FileDown, Printer, BarChart3, HelpCircle } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 
 export default function Index() {
   const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, adjustments, updateAdjustment, refreshDeals } = useAppData();
@@ -103,6 +104,45 @@ export default function Index() {
   const selectedMonthKey = isSingleMonth ? getMonthKey(dateRange.from) : currentMonthKey;
 
   const currentMonthPres = presentations[selectedMonthKey] || { bluepex: 0, opus: 0 };
+
+  // Chart Data Calculations
+  const volumeChartData = useMemo(() => {
+    let bpVolume = 0;
+    let opVolume = 0;
+    filteredDeals.forEach(d => {
+      const val = d.monthlyValue + d.implantationValue;
+      if (d.operation === "BluePex") bpVolume += val;
+      if (d.operation === "Opus Tech") opVolume += val;
+    });
+    return [
+      { name: "BluePex", volume: bpVolume, fill: "#3b82f6" },
+      { name: "Opus Tech", volume: opVolume, fill: "#10b981" }
+    ];
+  }, [filteredDeals]);
+
+  const presChartData = useMemo(() => {
+    let bpPres = 0;
+    let opPres = 0;
+    
+    if (isSingleMonth) {
+      bpPres = currentMonthPres.bluepex;
+      opPres = currentMonthPres.opus;
+    } else {
+      let start = new Date(dateRange.from);
+      const end = new Date(dateRange.to);
+      while (start <= end) {
+        const key = getMonthKey(start);
+        const p = presentations[key];
+        if (p) { bpPres += p.bluepex; opPres += p.opus; }
+        start.setMonth(start.getMonth() + 1);
+      }
+    }
+    
+    return [
+      { name: "BluePex", apresentacoes: bpPres, fill: "#3b82f6" },
+      { name: "Opus Tech", apresentacoes: opPres, fill: "#10b981" }
+    ];
+  }, [isSingleMonth, currentMonthPres, presentations, dateRange]);
 
   const kpis = useMemo(() => {
     let projected = 0;
@@ -266,14 +306,59 @@ export default function Index() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
-            <Card className="h-[300px] flex items-center justify-center bg-muted/20 border-dashed">
-              <CardContent className="text-muted-foreground font-medium">
-                [Volume por Operação - Wireframe Gráfico de BI]
+            {/* Volume Chart */}
+            <Card className="h-[300px] flex flex-col bg-card/60">
+              <CardContent className="flex-1 p-4 flex flex-col">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-4">
+                  Volume Bruto por Operação
+                </span>
+                <div className="flex-1 w-full relative min-h-[200px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={volumeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#888' }} />
+                      <YAxis tickFormatter={(val) => `R$${(val/1000)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#888' }} />
+                      <RechartsTooltip 
+                        formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                      />
+                      <Bar dataKey="volume" radius={[4, 4, 0, 0]}>
+                        {volumeChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
-            <Card className="h-[300px] flex items-center justify-center bg-muted/20 border-dashed">
-              <CardContent className="text-muted-foreground font-medium">
-                [Apresentações - Wireframe Gráfico de BI]
+
+            {/* Presentations Chart */}
+            <Card className="h-[300px] flex flex-col bg-card/60">
+              <CardContent className="flex-1 p-4 flex flex-col">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-4">
+                  Apresentações Realizadas {isSingleMonth ? periodSuffix : ""}
+                </span>
+                <div className="flex-1 w-full relative min-h-[200px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={presChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#888' }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#888' }} />
+                      <RechartsTooltip 
+                        formatter={(value: number) => [`${value} APs`, "Apresentações"]}
+                        contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                      />
+                      <Bar dataKey="apresentacoes" radius={[4, 4, 0, 0]}>
+                        {presChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
           </div>
