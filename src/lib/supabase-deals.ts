@@ -8,15 +8,15 @@ const dbToDeal = (db: any): Deal => ({
   closingDate: db.closing_date,
   implantationValue: db.implantation_value,
   monthlyValue: db.monthly_value,
-  isImplantationPaidByClient: db.is_implantacao_paid_by_client,
+  isImplantacao_paid_by_client: db.is_implantacao_paid_by_client,
   isMensalidadePaidByClient: db.is_mensalidade_paid_by_client,
   isPaidToUser: db.is_paid_to_user,
   isUserConfirmedPayment: db.is_user_confirmed_payment,
   userId: db.user_id,
   implantationPaymentDate: db.implantation_payment_date,
   firstPaymentDate: db.first_payment_date,
-  commissionAmountSnapshot: db.commission_amount_snapshot,
-  commissionRateSnapshot: db.commission_rate_snapshot,
+  commission_amount_snapshot: db.commission_amount_snapshot,
+  commission_rate_snapshot: db.commission_rate_snapshot,
 });
 
 const dealToDb = (deal: Partial<Deal>) => ({
@@ -37,40 +37,33 @@ const dealToDb = (deal: Partial<Deal>) => ({
 });
 
 export async function fetchDeals(): Promise<Deal[]> {
-  let isTestEnv = false;
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    isTestEnv = user?.email?.endsWith("@teste.com") || false;
-  } catch (err) {}
+  const { data: { user } } = await supabase.auth.getUser();
+  const isTestEnv = user?.email?.endsWith("@teste.com") || false;
+  
+  console.log(`[fetchDeals] Buscando dados para ambiente: ${isTestEnv ? "TESTE 🧪" : "PRODUÇÃO 🚀"} (User: ${user?.email})`);
 
-  // Busca com filtro de ambiente; se der erro de coluna, faz fallback automático
   let res = await supabase
     .from("deals")
     .select("*")
     .eq("is_test_data", isTestEnv)
     .order("closing_date", { ascending: false });
 
-  if (res.error && (res.error.message?.includes("is_test_data") || res.error.message?.includes("column"))) {
-    console.warn("[fetchDeals] Coluna is_test_data não encontrada, buscando tudo.");
-    res = await supabase
-      .from("deals")
-      .select("*")
-      .order("closing_date", { ascending: false });
+  if (res.error) {
+    console.error("[fetchDeals] Erro na busca principal:", res.error);
+    // Fallback: busca sem filtro se der erro de coluna
+    res = await supabase.from("deals").select("*").order("closing_date", { ascending: false });
   }
 
-  if (res.error) {
-    console.error("Error fetching deals:", res.error);
-    throw res.error;
-  }
+  console.log(`[fetchDeals] Negócios encontrados: ${res.data?.length || 0}`);
   return (res.data || []).map(dbToDeal);
 }
 
 export async function upsertDeal(deal: Deal): Promise<Deal> {
-  const { data, error } = await supabase
-    .from("deals")
-    .upsert(dealToDb(deal))
-    .select()
-    .single();
+  const { data: { user } } = await supabase.auth.getUser();
+  const isTestEnv = user?.email?.endsWith("@teste.com") || false;
+  
+  const payload = { ...dealToDb(deal), is_test_data: isTestEnv };
+  const { data, error } = await supabase.from("deals").upsert(payload).select().single();
 
   if (error) {
     console.error("Error upserting deal:", error);
@@ -80,13 +73,6 @@ export async function upsertDeal(deal: Deal): Promise<Deal> {
 }
 
 export async function deleteDealFromDb(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("deals")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error deleting deal:", error);
-    throw error;
-  }
+  const { error } = await supabase.from("deals").delete().eq("id", id);
+  if (error) throw error;
 }

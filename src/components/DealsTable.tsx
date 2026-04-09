@@ -100,9 +100,8 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                 const comm = calculateCommission(deal, presCount, settings, superMetaActive);
                 const isExpanded = expandedId === deal.id;
                 return (
-                  <>
+                  <div key={deal.id} style={{ display: 'contents' }}>
                     <TableRow
-                      key={deal.id}
                       className="border-border/30 hover:bg-muted/30 cursor-pointer"
                       onClick={() => toggleExpand(deal.id)}
                     >
@@ -188,7 +187,7 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </div>
                 );
               })}
             </TableBody>

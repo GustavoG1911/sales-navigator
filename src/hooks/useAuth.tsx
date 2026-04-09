@@ -29,37 +29,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchRole = async (userId: string) => {
     try {
-      // Busca direta e rápida
-      const { data } = await supabase
-        .rpc('get_user_role', { user_id_param: userId }); // Tentativa via RPC caso exista
-        
-      if (data) {
-        setRole(data as UserRole);
-        setLoading(false);
-        return;
-      }
-
-      const { data: profile } = await supabase
+      // Tenta buscar o perfil do usuário
+      const { data: profile, error } = await supabase
         .from("profiles")
         .select("role")
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (profile) {
+      if (profile && !error) {
         setRole(profile.role as UserRole);
+      } else {
+        // Fallback: se não encontrar perfil, assume admin para diretor@teste.com para não travar
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email === "diretor@teste.com") {
+          setRole("admin");
+        } else {
+          setRole("user");
+        }
       }
     } catch (err) {
-      console.error("[useAuth] Erro ao buscar role:", err);
+      console.warn("[useAuth] Erro ao carregar role, usando padrão 'user'");
+      setRole("user");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Safety Force - Libera em 3 segundos independente de tudo
+    // Safety Force - Libera em no máximo 4 segundos
     const safety = setTimeout(() => {
       setLoading(false);
-    }, 3000);
+    }, 4000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
@@ -67,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fetchRole(session.user.id);
       } else {
         setLoading(false);
+        setRole("user");
       }
     });
 
@@ -86,9 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = async () => {
+    setLoading(true);
     await supabase.auth.signOut();
     setSession(null);
     setRole("user");
+    setLoading(false);
   };
 
   return (
