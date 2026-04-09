@@ -49,7 +49,7 @@ export function AppSidebar() {
               <div className="h-5 w-5 rounded bg-primary flex items-center justify-center shrink-0">
                 <DollarSign className="h-3 w-3 text-primary-foreground" />
               </div>
-              {!collapsed && <span className="font-bold text-sm tracking-tight">DealFlow</span>}
+              {!collapsed && <span className="font-bold text-sm tracking-tight">BD Tech Manager</span>}
             </div>
           </SidebarGroupLabel>
           <SidebarGroupContent>

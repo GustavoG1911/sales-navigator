@@ -37,6 +37,7 @@ function dbToDeal(row: DbDeal): Deal {
     installmentCount: row.installment_count,
     installmentDates: Array.isArray(row.installment_dates) ? row.installment_dates : [],
     paymentStatus: row.payment_status as Deal["paymentStatus"],
+    userId: (row as any).user_id,
   };
 }
 
@@ -53,6 +54,7 @@ function dealToDb(deal: Deal) {
     installment_count: deal.installmentCount,
     installment_dates: deal.installmentDates,
     payment_status: deal.paymentStatus,
+    user_id: deal.userId,
   };
 }
 

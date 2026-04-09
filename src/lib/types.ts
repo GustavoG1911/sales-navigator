@@ -19,6 +19,7 @@ export interface Deal {
   installmentCount: number;
   installmentDates: InstallmentDate[];
   paymentStatus: PaymentStatus;
+  userId?: string;
 }
 
 export interface OperationPresentations {

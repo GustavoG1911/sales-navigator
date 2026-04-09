@@ -3,6 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { OperationPresentations, GlobalParameters } from "@/lib/types";
 import { getCommissionTier } from "@/lib/commission";
+import { HelpCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface PresentationsCardProps {
   data: OperationPresentations;
@@ -39,9 +41,21 @@ export function PresentationsCard({ data, globalParams, onChangeBluepex, onChang
   return (
     <Card className="glass-card col-span-2">
       <CardContent className="p-4">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3 block">
-          Apresentações por Operação
-        </span>
+        <div className="flex items-center gap-1.5 mb-3">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide block">
+            Apresentações por Operação
+          </span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-[14px] w-[14px] text-muted-foreground/60 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[250px] text-xs">
+                Regras de conversão: alcance a meta estipulada para ativar aceleradores de comissão.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
         <div className="grid grid-cols-2 gap-4">
           {/* BluePex */}
           <div>

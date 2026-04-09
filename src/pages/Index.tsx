@@ -14,11 +14,14 @@ import { Deal, PaymentStatus, GlobalParameters } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, DollarSign, TrendingUp, Wallet, BadgeDollarSign, CalendarDays, FileDown, Printer, BarChart3 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Plus, DollarSign, TrendingUp, BadgeDollarSign, CalendarDays, FileDown, Printer, BarChart3, HelpCircle } from "lucide-react";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Index() {
   const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, adjustments, updateAdjustment, refreshDeals } = useAppData();
-  const { signOut, role } = useAuth();
+  const { signOut, role, user } = useAuth();
 
   const [globalParams, setGlobalParams] = useState<GlobalParameters | undefined>(undefined);
 
@@ -63,12 +66,37 @@ export default function Index() {
     setPeriodType(type);
   };
 
+  const [filtroOperacao, setFiltroOperacao] = useState("Todas");
+  const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
+  const [profiles, setProfiles] = useState<any>({});
+
+  useEffect(() => {
+    if (role === "admin" || role === "gestor") {
+      supabase.from("profiles").select("user_id, full_name").then(({ data }) => {
+        if (data) {
+          const map: any = {};
+          data.forEach(p => map[p.user_id] = p.full_name);
+          setProfiles(map);
+        }
+      });
+    }
+  }, [role]);
+
   const filteredDeals = useMemo(
     () => deals.filter((d) => {
       const date = new Date(d.closingDate);
-      return date >= dateRange.from && date <= dateRange.to;
+      const passDate = date >= dateRange.from && date <= dateRange.to;
+
+      if (role === "admin" || role === "gestor") {
+        const passOp = filtroOperacao === "Todas" || d.operation === filtroOperacao;
+        const passUser = filtroFuncionario === "Todos" || d.userId === filtroFuncionario;
+        return passDate && passOp && passUser;
+      }
+
+      // User restricted view logic
+      return passDate && (!user || d.userId === user.id || !d.userId); 
     }),
-    [deals, dateRange]
+    [deals, dateRange, filtroOperacao, filtroFuncionario, role, user]
   );
 
   const isSingleMonth = dateRange.from.getMonth() === dateRange.to.getMonth() && dateRange.from.getFullYear() === dateRange.to.getFullYear();
@@ -127,18 +155,56 @@ export default function Index() {
 
   return (
     <div className="container py-5">
-      <div className="mb-4 flex items-center justify-between">
-        <PeriodFilter onPeriodChange={handlePeriodChange} />
+      <div className="mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-4 w-full md:w-auto">
+          
+          {(role === "admin" || role === "gestor") && (
+            <Card className="bg-muted/30">
+              <CardContent className="p-4 flex flex-wrap items-center gap-4">
+                <PeriodFilter onPeriodChange={handlePeriodChange} />
+                <Select value={filtroOperacao} onValueChange={setFiltroOperacao}>
+                  <SelectTrigger className="w-[140px] md:w-[160px] h-9 text-xs font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                    <SelectValue placeholder="Operação" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Todas">Todas Operações</SelectItem>
+                    <SelectItem value="BluePex">BluePex</SelectItem>
+                    <SelectItem value="Opus Tech">Opus Tech</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={filtroFuncionario} onValueChange={setFiltroFuncionario}>
+                  <SelectTrigger className="w-[140px] md:w-[160px] h-9 text-xs font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                    <SelectValue placeholder="Funcionário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Todos">Todos Funcionários</SelectItem>
+                    {Object.entries(profiles).map(([id, name]) => (
+                      <SelectItem key={id} value={id}>{name as string}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
+
+          {role === "user" && (
+            <div className="flex items-center">
+              <PeriodFilter onPeriodChange={handlePeriodChange} />
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center gap-2">
-          <Button onClick={handleNewDeal} size="sm" className="h-8 text-xs">
+          <Button onClick={handleNewDeal} size="sm" className="h-9 text-xs">
             <Plus className="h-3.5 w-3.5 mr-1" />
             Novo Fechamento
           </Button>
-          <Button onClick={handleDownloadReport} size="sm" variant="outline" className="h-8 text-xs">
+          <Button onClick={handleDownloadReport} size="sm" variant="outline" className="h-9 text-xs">
             <FileDown className="h-3.5 w-3.5 mr-1" />
             PDF
           </Button>
-          <Button onClick={handlePrintReport} size="sm" variant="ghost" className="h-8 w-8 p-0">
+          <Button onClick={handlePrintReport} size="sm" variant="ghost" className="h-9 w-9 p-0">
             <Printer className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -161,41 +227,55 @@ export default function Index() {
           </div>
 
           <div>
-            <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold">Comissões geradas no período</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <KpiCard title="Salário Fixo" value={formatCurrency(kpis.salary)} icon={Wallet} />
-              <KpiCard title={`Projetada ${periodSuffix}`} value={formatCurrency(kpis.projected)} icon={TrendingUp} variant="primary" />
+            <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold flex items-center gap-2">
+              Comissões geradas no período
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <KpiCard 
+                title="Fechamentos do Mês" 
+                value={filteredDeals.length.toString()} 
+                icon={BarChart3} 
+                onClick={() => {
+                  const el = document.getElementById("deals-table-container");
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+              />
+              <KpiCard 
+                title={`Projetada ${periodSuffix}`} 
+                value={formatCurrency(kpis.projected)} 
+                icon={TrendingUp} 
+                variant="primary" 
+                tooltip="Soma das comissões e implantações de negócios fechados no período que ainda não foram pagos."
+              />
               <KpiCard title={`Paga ${periodSuffix}`} value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" />
               <KpiCard title={`Total ${periodSuffix}`} value={formatCurrency(kpis.total)} icon={DollarSign} variant="warning" />
-              {isSingleMonth ? (
-                <PresentationsCard
-                  data={currentMonthPres}
-                  globalParams={globalParams}
-                  onChangeBluepex={(c) => updatePresentations(selectedMonthKey, "bluepex", c)}
-                  onChangeOpus={(c) => updatePresentations(selectedMonthKey, "opus", c)}
-                />
-              ) : (
-                <KpiCard
-                  title="Apresentações"
-                  value={kpis.presentations.toString()}
-                  icon={CalendarDays}
-                  trend="Soma do período"
-                />
-              )}
             </div>
           </div>
 
-          <OperationsChart deals={filteredDeals} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
+            <Card className="h-[300px] flex items-center justify-center bg-muted/20 border-dashed">
+              <CardContent className="text-muted-foreground font-medium">
+                [Volume por Operação - Wireframe Gráfico de BI]
+              </CardContent>
+            </Card>
+            <Card className="h-[300px] flex items-center justify-center bg-muted/20 border-dashed">
+              <CardContent className="text-muted-foreground font-medium">
+                [Apresentações - Wireframe Gráfico de BI]
+              </CardContent>
+            </Card>
+          </div>
 
-          <DealsTable
-            deals={filteredDeals}
-            presentations={presentations}
-            settings={settings}
-            superMetaActive={false}
-            onEdit={handleEdit}
-            onDelete={removeDeal}
-            onStatusChange={handleStatusChange}
-          />
+          <div id="deals-table-container">
+            <DealsTable
+              deals={filteredDeals}
+              presentations={presentations}
+              settings={settings}
+              superMetaActive={false}
+              onEdit={handleEdit}
+              onDelete={removeDeal}
+              onStatusChange={handleStatusChange}
+            />
+          </div>
         </TabsContent>
       </Tabs>
 

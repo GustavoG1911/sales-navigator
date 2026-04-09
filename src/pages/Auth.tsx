@@ -67,7 +67,7 @@ export default function Auth() {
           <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
             <DollarSign className="h-5 w-5 text-primary-foreground" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">DealFlow</h1>
+          <h1 className="text-xl font-bold tracking-tight">BD Tech Manager</h1>
           <p className="text-sm text-muted-foreground">Gestão de comissões e recebíveis</p>
         </div>
 
