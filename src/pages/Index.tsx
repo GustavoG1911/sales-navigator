@@ -232,13 +232,14 @@ export default function Index() {
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <KpiCard 
-                title="Fechamentos do Mês" 
+                title={`FECHAMENTOS ${periodSuffix.toUpperCase()}`}
                 value={filteredDeals.length.toString()} 
                 icon={BarChart3} 
                 onClick={() => {
                   const el = document.getElementById("deals-table-container");
                   if (el) el.scrollIntoView({ behavior: 'smooth' });
                 }}
+                tooltip="Volume de negócios concretizados no período selecionado."
               />
               <KpiCard 
                 title={`Projetada ${periodSuffix}`} 
@@ -247,8 +248,20 @@ export default function Index() {
                 variant="primary" 
                 tooltip="Soma das comissões e implantações de negócios fechados no período que ainda não foram pagos."
               />
-              <KpiCard title={`Paga ${periodSuffix}`} value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" />
-              <KpiCard title={`Total ${periodSuffix}`} value={formatCurrency(kpis.total)} icon={DollarSign} variant="warning" />
+              <KpiCard 
+                title={`Paga ${periodSuffix}`} 
+                value={formatCurrency(kpis.paid)} 
+                icon={BadgeDollarSign} 
+                variant="success" 
+                tooltip="Soma das comissões e implantações que já constam como recebidas/pagas."
+              />
+              <KpiCard 
+                title={`Total ${periodSuffix}`} 
+                value={formatCurrency(kpis.total)} 
+                icon={DollarSign} 
+                variant="warning" 
+                tooltip="Montante bruto geral (Pago + Projetado) gerado no período."
+              />
             </div>
           </div>
 

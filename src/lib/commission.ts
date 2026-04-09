@@ -108,3 +108,23 @@ export function getPayableMonthKey(closingDate: string): string {
   d.setMonth(d.getMonth() + 1);
   return getMonthKey(d);
 }
+
+/**
+ * Rule of the 7th:
+ * If closingDate day < 7 -> payable in the SAME month, on the 20th.
+ * If closingDate day >= 7 -> payable in the NEXT month, on the 20th.
+ */
+export function getPaymentDateInfo(closingDate: string): { monthKey: string, expectedPaymentDate: string } {
+  const d = new Date(closingDate + "T12:00:00");
+  const day = d.getDate();
+  const targetDate = new Date(closingDate + "T12:00:00");
+  
+  if (day >= 7) {
+    targetDate.setMonth(targetDate.getMonth() + 1);
+  }
+  
+  const monthKey = getMonthKey(targetDate);
+  const expectedPaymentDate = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, "0")}-20`;
+  
+  return { monthKey, expectedPaymentDate };
+}
