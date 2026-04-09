@@ -29,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchRole = async (userId: string) => {
     try {
-      console.log("[useAuth] Buscando perfil para:", userId);
+      console.log("[useAuth] Chamada fetchRole para:", userId);
       const { data, error } = await supabase
         .from("profiles")
         .select("role")
@@ -37,14 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (error) {
-        if (error.message?.includes("querying schema")) {
-          console.warn("[useAuth] Supabase ainda atualizando o schema. Entrando como 'user' por segurança.");
-        } else {
-          console.error("[useAuth] Erro ao buscar perfil:", error.message);
+        if (!error.message?.includes("querying schema")) {
+           console.error("[useAuth] Erro no fetchRole:", error.message);
         }
         setRole("user");
-        setLoading(false);
-        return;
       } else if (data) {
         const dbRole = data.role as any;
         if (dbRole === "admin") setRole("admin");
@@ -54,40 +50,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole("user");
       }
     } catch (err) {
-      console.error("[useAuth] Crash fatal no fetchRole capturado:", err);
+      console.error("[useAuth] Crash no fetchRole:", err);
       setRole("user");
     } finally {
-      // Garante que o estado de loading saia de true independente de erro
+      console.log("[useAuth] Finalizado carregamento de papel.");
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("[useAuth] Auth state changed:", _event, session?.user?.email);
-      setSession(session);
-      if (session?.user) {
-        fetchRole(session.user.id);
+    // 1. Ouvinte principal de estados de Auth do Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      console.log("[useAuth] Evento de Auth detetado:", _event);
+      setSession(newSession);
+      
+      if (newSession?.user) {
+        await fetchRole(newSession.user.id);
       } else {
         setRole("user");
         setLoading(false);
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        fetchRole(session.user.id);
-      } else {
+    // 2. Fallback: Se o onAuthStateChange demorar, tenta pegar a sessão inicial
+    const checkInitialSession = async () => {
+      const { data: { session: initialSession } } = await supabase.auth.getSession();
+      if (initialSession && !session) {
+        setSession(initialSession);
+        await fetchRole(initialSession.user.id);
+      } else if (!initialSession) {
         setLoading(false);
       }
-    });
+    };
+
+    checkInitialSession();
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
+    setLoading(true);
     await supabase.auth.signOut();
+    setSession(null);
+    setRole("user");
+    setLoading(false);
   };
 
   return (
