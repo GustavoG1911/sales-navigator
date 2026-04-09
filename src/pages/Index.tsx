@@ -27,12 +27,17 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 
 export default function Index() {
   const queryClient = useQueryClient();
-  const { signOut, role, user } = useAuth();
-  const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
-  const sdrIdForData = role === "admin" || role === "gestor" ? (filtroFuncionario === "Todos" ? undefined : filtroFuncionario) : user?.id;
-  
+  const { role, user } = useAuth();
   const { deals = [], loading, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, addOrUpdateDeal, removeDeal } = useAppData(role, user?.email);
 
+  // ESTADOS E DATAS (Devem vir antes de qualquer useMemo)
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const selectedMonthKey = getMonthKey(selectedMonth);
+  const [periodType, setPeriodType] = useState<PeriodType>("month");
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  
   const currentMonthKey = getMonthKey(new Date());
   const now = new Date();
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -40,23 +45,30 @@ export default function Index() {
     to: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
   });
   const [periodLabel, setPeriodLabel] = useState(formatMonthLabel(currentMonthKey));
-  const [periodType, setPeriodType] = useState<PeriodType>("month");
   const [formOpen, setFormOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
-  
   const [kpiModalType, setKpiModalType] = useState<"projected" | "paid" | "deals" | null>(null);
-  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [filtroOperacao, setFiltroOperacao] = useState("Todas");
+  const [profiles, setProfiles] = useState<any>({});
+  const [kpiModalTitles] = useState({
+    projected: "Comissão Projetada (Pendente)",
+    paid: "Comissão Destravada (Paga)",
+    deals: "Fechamentos",
+    volume: "Volume Total"
+  });
 
   const periodSuffix = periodType === "month" ? "do Mês" : periodType === "quarter" ? "do Trimestre" : periodType === "year" ? "do Ano" : "do Período";
+
+  // LOGICA DERIVADA (Somente após os estados)
+  const isSingleMonth = dateRange.from.getMonth() === dateRange.to.getMonth() && dateRange.from.getFullYear() === dateRange.to.getFullYear();
+  const currentMonthPres = presentations[selectedMonthKey] || { bluepex: 0, opus: 0 };
 
   const handlePeriodChange = (range: DateRange, label: string, type: PeriodType) => {
     setDateRange(range);
     setPeriodLabel(label);
     setPeriodType(type);
+    if (range.from) setSelectedMonth(range.from);
   };
-
-  const [filtroOperacao, setFiltroOperacao] = useState("Todas");
-  const [profiles, setProfiles] = useState<any>({});
 
   useEffect(() => {
     if (role === "admin" || role === "gestor") {
@@ -107,11 +119,6 @@ export default function Index() {
   );
 
   const filteredDeals = closedDeals; // Fallback for table and other uses
-
-  const isSingleMonth = dateRange.from.getMonth() === dateRange.to.getMonth() && dateRange.from.getFullYear() === dateRange.to.getFullYear();
-  const selectedMonthKey = isSingleMonth ? getMonthKey(dateRange.from) : currentMonthKey;
-
-  const currentMonthPres = presentations[selectedMonthKey] || { bluepex: 0, opus: 0 };
 
   // Timeline Data for Charts
   const chartTimeline = useMemo(() => {
