@@ -20,14 +20,15 @@ interface MockUser {
   email: string;
   displayName: string;
   role: "admin" | "gestor" | "user";
+  position: "SDR" | "Executivo de Negócios" | "Diretor";
   createdAt: string;
 }
 
 const MOCK_USERS: MockUser[] = [
-  { id: "1", email: "admin@dealflow.com", displayName: "Admin Principal", role: "admin", createdAt: "2025-01-15" },
-  { id: "2", email: "joao.silva@dealflow.com", displayName: "João Silva", role: "user", createdAt: "2025-02-20" },
-  { id: "3", email: "maria.santos@dealflow.com", displayName: "Maria Santos", role: "gestor", createdAt: "2025-03-10" },
-  { id: "4", email: "pedro.costa@dealflow.com", displayName: "Pedro Costa", role: "admin", createdAt: "2025-04-01" },
+  { id: "1", email: "admin@dealflow.com", displayName: "Admin Principal", role: "admin", position: "Diretor", createdAt: "2025-01-15" },
+  { id: "2", email: "joao.silva@dealflow.com", displayName: "João Silva", role: "user", position: "SDR", createdAt: "2025-02-20" },
+  { id: "3", email: "maria.santos@dealflow.com", displayName: "Maria Santos", role: "gestor", position: "Executivo de Negócios", createdAt: "2025-03-10" },
+  { id: "4", email: "pedro.costa@dealflow.com", displayName: "Pedro Costa", role: "admin", position: "Diretor", createdAt: "2025-04-01" },
 ];
 
 export function SystemSettingsPanel() {
@@ -42,6 +43,13 @@ export function SystemSettingsPanel() {
       prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
     );
     toast.info("Alteração de cargo simulada (mockup). Nenhuma alteração foi salva no banco.");
+  };
+
+  const handlePositionChange = (userId: string, newPosition: "SDR" | "Executivo de Negócios" | "Diretor") => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, position: newPosition } : u))
+    );
+    toast.info("Alteração de função simulada (mockup). Nenhuma alteração foi salva no banco.");
   };
 
   const handleSaveParams = () => {
@@ -69,7 +77,8 @@ export function SystemSettingsPanel() {
                   <TableHead className="text-xs">Usuário</TableHead>
                   <TableHead className="text-xs">E-mail</TableHead>
                   <TableHead className="text-xs">Desde</TableHead>
-                  <TableHead className="text-xs w-[160px]">Cargo</TableHead>
+                  <TableHead className="text-xs w-[160px]">Função na Empresa</TableHead>
+                  <TableHead className="text-xs w-[140px]">Nível de Sistema</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -86,6 +95,21 @@ export function SystemSettingsPanel() {
                     <TableCell className="text-xs text-muted-foreground">{user.email}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(user.createdAt).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={user.position}
+                        onValueChange={(val) => handlePositionChange(user.id, val as any)}
+                      >
+                        <SelectTrigger className="h-8 text-xs w-[150px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SDR">SDR</SelectItem>
+                          <SelectItem value="Executivo de Negócios">Executivo de Negócios</SelectItem>
+                          <SelectItem value="Diretor">Diretor</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
                       <Select

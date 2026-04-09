@@ -74,7 +74,7 @@ export default function FinanceiroGestor() {
     );
   }
 
-  if (role !== "gestor") {
+  if (role !== "gestor" && role !== "admin") {
     return <Navigate to="/" replace />;
   }
 

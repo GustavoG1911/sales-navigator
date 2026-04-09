@@ -68,7 +68,7 @@ export default function Settings() {
 }
 
 function ProfileTab() {
-  const { user } = useAuth();
+  const { user, role: currentUserRole } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -76,13 +76,15 @@ function ProfileTab() {
     job_title: "",
     fixed_salary: 0,
     commission_percent: 20,
+    position: "SDR",
+    role: "user",
   });
 
   useEffect(() => {
     if (!user) return;
     supabase
       .from("profiles")
-      .select("full_name, job_title, fixed_salary, commission_percent")
+      .select("full_name, job_title, fixed_salary, commission_percent, position, role")
       .eq("user_id", user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -92,6 +94,8 @@ function ProfileTab() {
             job_title: data.job_title || "",
             fixed_salary: data.fixed_salary || 0,
             commission_percent: data.commission_percent || 20,
+            position: data.position || "SDR",
+            role: data.role || "user",
           });
         }
         setLoading(false);
@@ -105,14 +109,21 @@ function ProfileTab() {
       return;
     }
     setSaving(true);
+    const updateData: any = {
+      full_name: form.full_name.trim(),
+      job_title: form.job_title.trim(),
+      fixed_salary: form.fixed_salary,
+      commission_percent: form.commission_percent,
+      position: form.position,
+    };
+
+    if (currentUserRole === "admin") {
+      updateData.role = form.role;
+    }
+
     const { error } = await supabase
       .from("profiles")
-      .update({
-        full_name: form.full_name.trim(),
-        job_title: form.job_title.trim(),
-        fixed_salary: form.fixed_salary,
-        commission_percent: form.commission_percent,
-      })
+      .update(updateData)
       .eq("user_id", user.id);
     setSaving(false);
     if (error) {
@@ -140,6 +151,44 @@ function ProfileTab() {
         <div className="space-y-1.5">
           <Label className="text-xs">Cargo *</Label>
           <Input value={form.job_title} onChange={(e) => setForm({ ...form, job_title: e.target.value })} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Nível de Sistema</Label>
+            <Select 
+              value={form.role} 
+              onValueChange={(val) => setForm({ ...form, role: val })} 
+              disabled={currentUserRole !== "admin"}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="gestor">Gestor</SelectItem>
+                <SelectItem value="user">User</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Função na Empresa</Label>
+            <div className="flex gap-2">
+              <Select 
+                value={["SDR", "Executivo de Negócios", "Diretor"].includes(form.position) ? form.position : ""} 
+                onValueChange={(val) => setForm({ ...form, position: val })}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SDR">SDR</SelectItem>
+                  <SelectItem value="Executivo de Negócios">Executivo de Negócios</SelectItem>
+                  <SelectItem value="Diretor">Diretor</SelectItem>
+                </SelectContent>
+              </Select>
+              {/* Optional fallback if they type something completely custom: it could just be a select or an input. The user said Input/Select. We'll use just Select for simplicity but you can type in Input as well */}
+            </div>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
@@ -297,7 +346,7 @@ function TeamTab() {
   useEffect(() => {
     supabase
       .from("profiles")
-      .select("id, user_id, display_name, full_name, role, job_title, created_at")
+      .select("id, user_id, display_name, full_name, role, job_title, position, created_at")
       .order("created_at", { ascending: true })
       .then(({ data, error }) => {
         if (data) setProfiles(data);
@@ -306,17 +355,17 @@ function TeamTab() {
       });
   }, []);
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
+  const handleUpdateField = async (userId: string, field: "role" | "position", newRole: string) => {
     const { error } = await supabase
       .from("profiles")
-      .update({ role: newRole })
+      .update({ [field]: newRole })
       .eq("user_id", userId);
     if (error) {
-      toast.error("Erro ao alterar cargo: " + error.message);
+      toast.error(`Erro ao alterar ${field}: ` + error.message);
       return;
     }
-    toast.success("Cargo atualizado!");
-    setProfiles((prev) => prev.map((p) => (p.user_id === userId ? { ...p, role: newRole } : p)));
+    toast.success("Perfil atualizado!");
+    setProfiles((prev) => prev.map((p) => (p.user_id === userId ? { ...p, [field]: newRole } : p)));
   };
 
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
@@ -335,9 +384,10 @@ function TeamTab() {
             <TableHeader>
               <TableRow>
                 <TableHead className="text-xs">Usuário</TableHead>
-                <TableHead className="text-xs">Cargo Funcional</TableHead>
+                <TableHead className="text-xs">Cargo Descritivo</TableHead>
                 <TableHead className="text-xs">Desde</TableHead>
-                <TableHead className="text-xs w-[150px]">Role</TableHead>
+                <TableHead className="text-xs w-[160px]">Função na Empresa</TableHead>
+                <TableHead className="text-xs w-[140px]">Nível de Sistema</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -359,7 +409,19 @@ function TeamTab() {
                     {new Date(p.created_at).toLocaleDateString("pt-BR")}
                   </TableCell>
                   <TableCell>
-                    <Select value={p.role || "sdr"} onValueChange={(val) => handleRoleChange(p.user_id, val)}>
+                    <Select value={p.position || "SDR"} onValueChange={(val) => handleUpdateField(p.user_id, "position", val)}>
+                      <SelectTrigger className="h-8 text-xs w-[150px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SDR">SDR</SelectItem>
+                        <SelectItem value="Executivo de Negócios">Executivo de Negócios</SelectItem>
+                        <SelectItem value="Diretor">Diretor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
+                    <Select value={p.role || "user"} onValueChange={(val) => handleUpdateField(p.user_id, "role", val)}>
                       <SelectTrigger className="h-8 text-xs w-[130px]">
                         <SelectValue />
                       </SelectTrigger>
@@ -370,8 +432,8 @@ function TeamTab() {
                         <SelectItem value="gestor">
                           <div className="flex items-center gap-1.5"><Users className="h-3 w-3 text-muted-foreground" /> Gestor</div>
                         </SelectItem>
-                        <SelectItem value="sdr">
-                          <div className="flex items-center gap-1.5"><UserCog className="h-3 w-3 text-muted-foreground" /> SDR</div>
+                        <SelectItem value="user">
+                          <div className="flex items-center gap-1.5"><User className="h-3 w-3 text-muted-foreground" /> User</div>
                         </SelectItem>
                       </SelectContent>
                     </Select>

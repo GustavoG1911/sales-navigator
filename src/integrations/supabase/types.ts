@@ -276,6 +276,7 @@ export type Database = {
           id: string
           is_sandbox: boolean | null
           job_title: string | null
+          position: string | null
           role: string | null
           updated_at: string
           user_id: string
@@ -290,6 +291,7 @@ export type Database = {
           id?: string
           is_sandbox?: boolean | null
           job_title?: string | null
+          position?: string | null
           role?: string | null
           updated_at?: string
           user_id: string
@@ -304,6 +306,7 @@ export type Database = {
           id?: string
           is_sandbox?: boolean | null
           job_title?: string | null
+          position?: string | null
           role?: string | null
           updated_at?: string
           user_id?: string
