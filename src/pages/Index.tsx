@@ -80,7 +80,7 @@ export default function Index() {
       // User restricted view logic
       return passDate && (!user || d.userId === user.id || !d.userId); 
     }),
-    [deals, dateRange, filtroOperacao, filtroFuncionario, role, user]
+    [deals, dateRange, filtroOperacao, filtroFuncionario, role, user, periodType]
   );
 
   const isSingleMonth = dateRange.from.getMonth() === dateRange.to.getMonth() && dateRange.from.getFullYear() === dateRange.to.getFullYear();
@@ -136,9 +136,21 @@ export default function Index() {
       projected += comm.totalCommission;
       if (deal.paymentStatus === "Pago") paid += comm.totalCommission;
     });
-    const totalPres = currentMonthPres.bluepex + currentMonthPres.opus;
+    let totalPres = 0;
+    if (isSingleMonth) {
+      totalPres = currentMonthPres.bluepex + currentMonthPres.opus;
+    } else {
+      let start = new Date(dateRange.from);
+      const end = new Date(dateRange.to);
+      while (start <= end) {
+        const key = getMonthKey(start);
+        const p = presentations[key];
+        if (p) totalPres += (p.bluepex + p.opus);
+        start.setMonth(start.getMonth() + 1);
+      }
+    }
     return { salary: settings.fixedSalary, projected, paid, total: settings.fixedSalary + paid, presentations: totalPres };
-  }, [filteredDeals, presentations, settings, currentMonthPres]);
+  }, [filteredDeals, presentations, settings, currentMonthPres, isSingleMonth, dateRange]);
 
   const handleStatusChange = (deal: Deal, status: PaymentStatus) => {
     addOrUpdateDeal({ ...deal, paymentStatus: status });

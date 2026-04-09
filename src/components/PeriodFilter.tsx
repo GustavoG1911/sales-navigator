@@ -93,7 +93,25 @@ export function PeriodFilter({ onPeriodChange }: PeriodFilterProps) {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <Select value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
+      <Select 
+        value={periodType} 
+        onValueChange={(v) => {
+          const newType = v as PeriodType;
+          setPeriodType(newType);
+          
+          // Auto-trigger update when type changes to provide immediate feedback
+          let defaultValue = "";
+          if (newType === "month") defaultValue = currentKey;
+          else if (newType === "quarter") defaultValue = `Q${Math.floor(currentMonth / 3) + 1}-${currentYear}`;
+          else if (newType === "year") defaultValue = `Y-${currentYear}`;
+          
+          if (defaultValue) {
+            const allOptions = [...monthOptions, ...quarterOptions, ...yearOptions];
+            const opt = allOptions.find((o) => o.value === defaultValue);
+            if (opt) onPeriodChange(opt.range, opt.label, newType);
+          }
+        }}
+      >
         <SelectTrigger className="w-[130px] h-9 text-sm">
           <SelectValue />
         </SelectTrigger>

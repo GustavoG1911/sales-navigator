@@ -399,6 +399,8 @@ function FinanceiroContent() {
   const [filtroOperacao, setFiltroOperacao] = useState("Todas");
   const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
+  const [filterType, setFilterType] = useState<"month" | "year">("month");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [kpiModalType, setKpiModalType] = useState<"volume" | "pago" | "projetado" | "fixo" | null>(null);
   
   const monthOptions = useMemo(() => buildMonthOptions(), []);
@@ -408,7 +410,7 @@ function FinanceiroContent() {
   const { presentations } = useAppData(role, user?.id);
 
   const { data, isLoading: loading } = useQuery({
-    queryKey: ["finance-data", role, user?.id],
+    queryKey: ["finance-data", role, user?.id, filterType, selectedYear],
     queryFn: async () => {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const isTestEnv = currentUser?.email?.endsWith("@teste.com") || false;
@@ -460,15 +462,17 @@ function FinanceiroContent() {
   // Filter deals relevant to selected month and cross-filters
   const filteredDeals = useMemo(() => {
     return deals.filter((d) => {
-      // Month - using getPaymentDateInfo (Rule of 7)
-      const baseDate = d.first_payment_date || d.implantation_payment_date;
-      let monthKey = "";
-      if (baseDate) {
-        monthKey = getPaymentDateInfo(baseDate).monthKey;
+      // Time filtering based on filterType
+      const baseDate = d.first_payment_date || d.implantation_payment_date || d.closing_date;
+      const dateObj = new Date(baseDate);
+      
+      let passTime = false;
+      if (filterType === "month") {
+        const monthKey = baseDate ? getPaymentDateInfo(baseDate).monthKey : getMonthKey(d.closing_date);
+        passTime = monthKey === selectedMonth;
       } else {
-        monthKey = getMonthKey(d.closing_date);
+        passTime = dateObj.getFullYear().toString() === selectedYear;
       }
-      const passMonth = monthKey === selectedMonth;
 
       // Operation
       const passOp = filtroOperacao === "Todas" || d.operation === filtroOperacao;
@@ -485,20 +489,27 @@ function FinanceiroContent() {
         passStatus = !(d.is_mensalidade_paid_by_client && d.is_paid_to_user && d.is_user_confirmed_payment);
       }
 
-      return passMonth && passOp && passUser && passStatus;
+      return passTime && passOp && passUser && passStatus;
     });
-  }, [deals, selectedMonth, filtroOperacao, filtroFuncionario, filtroStatus]);
+  }, [deals, selectedMonth, filterType, selectedYear, filtroOperacao, filtroFuncionario, filtroStatus]);
 
   const filteredSalaries = useMemo(() => {
     return salaries.filter((s) => {
-      const passMonth = getMonthKey(s.reference_month) === selectedMonth;
+      const dateObj = new Date(s.reference_month);
+      let passTime = false;
+      if (filterType === "month") {
+        passTime = getMonthKey(s.reference_month) === selectedMonth;
+      } else {
+        passTime = dateObj.getFullYear().toString() === selectedYear;
+      }
+
       const passUser = filtroFuncionario === "Todos" || s.user_id === filtroFuncionario;
       let passStatus = true;
       if (filtroStatus === "Finalizados") passStatus = s.is_paid_by_gestor === true;
       if (filtroStatus === "Pendentes") passStatus = !s.is_paid_by_gestor;
-      return passMonth && passUser && passStatus;
+      return passTime && passUser && passStatus;
     });
-  }, [salaries, selectedMonth, filtroFuncionario, filtroStatus]);
+  }, [salaries, selectedMonth, filterType, selectedYear, filtroFuncionario, filtroStatus]);
 
   // KPI Calculations based on filtered lists
   const kpis = useMemo(() => {
@@ -514,12 +525,14 @@ function FinanceiroContent() {
     const opSuperMeta = 30;
 
     filteredDeals.forEach((deal) => {
-      // Only count if it's due this month according to the cut-off rule
+      // Logic for commission calculation
       const baseDate = deal.first_payment_date || deal.implantation_payment_date;
-      if (!baseDate) return; // Se não tem data base do cliente, não calcula comissão para não poluir fluxo
+      if (!baseDate) return; 
       
       const { monthKey } = getPaymentDateInfo(baseDate);
-      if (monthKey !== selectedMonth) return;
+      
+      // If monthly view, must match selectedMonth
+      if (filterType === "month" && monthKey !== selectedMonth) return;
 
       volumeTotal += deal.monthly_value + deal.implantation_value;
 
@@ -545,7 +558,7 @@ function FinanceiroContent() {
     });
 
     return { totalFixo, totalProjetado, totalPago, volumeTotal };
-  }, [filteredDeals, filteredSalaries, selectedMonth, presentations, profiles]);
+  }, [filteredDeals, filteredSalaries, selectedMonth, filterType, selectedYear, presentations, profiles]);
 
   const futureProjections = useMemo(() => {
     const projMap: Record<string, { projectedIn: number, projectedOut: number }> = {};
@@ -553,7 +566,12 @@ function FinanceiroContent() {
       const baseDate = deal.first_payment_date || deal.implantation_payment_date;
       if (!baseDate) return;
       const { monthKey } = getPaymentDateInfo(baseDate);
-      if (monthKey > selectedMonth) {
+      
+      const isFuture = filterType === "month" 
+        ? monthKey > selectedMonth 
+        : monthKey.split("-")[0] > selectedYear;
+
+      if (isFuture) {
         if (!projMap[monthKey]) projMap[monthKey] = { projectedIn: 0, projectedOut: 0 };
         projMap[monthKey].projectedIn += deal.monthly_value + deal.implantation_value;
 
@@ -580,8 +598,9 @@ function FinanceiroContent() {
 
     return Object.entries(projMap)
       .map(([key, vals]) => ({ monthKey: key, ...vals }))
-      .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
-  }, [deals, selectedMonth, presentations, profiles]);
+      .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
+      .slice(0, 6); // Limita projeção
+  }, [deals, selectedMonth, filterType, selectedYear, presentations, profiles]);
 
   // Deals with confirmed client payment (ready for payout)
   const payableDeals = useMemo(() => {
@@ -706,18 +725,40 @@ function FinanceiroContent() {
             </SelectContent>
           </Select>
 
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[140px] md:w-[160px] h-8 text-xs">
-              <SelectValue placeholder="Mês Referência" />
+          <Select value={filterType} onValueChange={(v: any) => setFilterType(v)}>
+            <SelectTrigger className="w-[100px] h-8 text-xs font-medium">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {monthOptions.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
+              <SelectItem value="month">Mensal</SelectItem>
+              <SelectItem value="year">Anual</SelectItem>
             </SelectContent>
           </Select>
+
+          {filterType === "month" ? (
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[140px] md:w-[160px] h-8 text-xs">
+                <SelectValue placeholder="Mês Referência" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-[100px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="2025">2025</SelectItem>
+                <SelectItem value="2026">2026</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
 
           <Select value={filtroStatus} onValueChange={setFiltroStatus}>
             <SelectTrigger className="w-[140px] md:w-[160px] h-8 text-xs">
