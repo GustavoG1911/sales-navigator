@@ -1,7 +1,7 @@
-import { Home, Target, CalendarDays, Settings, LogOut, DollarSign } from "lucide-react";
+import { Home, Target, CalendarDays, Settings, LogOut, DollarSign, Landmark } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, UserRole } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
@@ -17,8 +17,17 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
-const navItems = [
+interface NavItem {
+  title: string;
+  url: string;
+  icon: any;
+  comingSoon?: boolean;
+  roles?: UserRole[];
+}
+
+const navItems: NavItem[] = [
   { title: "Dashboard", url: "/", icon: Home },
+  { title: "Financeiro", url: "/financeiro-gestor", icon: Landmark, roles: ["gestor"] },
   { title: "Prospecção", url: "/prospeccao", icon: Target, comingSoon: true },
   { title: "Agenda", url: "/agenda", icon: CalendarDays, comingSoon: true },
   { title: "Configurações", url: "/settings", icon: Settings },
@@ -27,7 +36,9 @@ const navItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { signOut } = useAuth();
+  const { signOut, role } = useAuth();
+
+  const visibleItems = navItems.filter((item) => !item.roles || item.roles.includes(role));
 
   return (
     <Sidebar collapsible="icon">
@@ -43,7 +54,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {visibleItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     {item.comingSoon ? (
