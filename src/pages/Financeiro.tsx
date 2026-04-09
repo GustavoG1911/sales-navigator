@@ -130,8 +130,9 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
 
   const filteredDeals = useMemo(() => {
     return deals.filter((d) => {
-      // Regra de Corte (Dia 7)
-      const { monthKey } = getPaymentDateInfo(d.closing_date);
+      // Regra de Corte (<= 7)
+      const baseDate = d.first_payment_date || d.implantation_payment_date || d.closing_date;
+      const { monthKey } = getPaymentDateInfo(baseDate);
       return monthKey === selectedMonth;
     });
   }, [deals, selectedMonth]);
@@ -340,7 +341,8 @@ function FinanceiroContent() {
   const filteredDeals = useMemo(() => {
     return deals.filter((d) => {
       // Month - using getPaymentDateInfo (Rule of 7)
-      const { monthKey } = getPaymentDateInfo(d.closing_date);
+      const baseDate = d.first_payment_date || d.implantation_payment_date || d.closing_date;
+      const { monthKey } = getPaymentDateInfo(baseDate);
       const passMonth = monthKey === selectedMonth;
 
       // Operation
@@ -376,7 +378,8 @@ function FinanceiroContent() {
 
     filteredDeals.forEach((deal) => {
       // Only count if it's due this month according to the cut-off rule
-      const { monthKey } = getPaymentDateInfo(deal.closing_date);
+      const baseDate = deal.first_payment_date || deal.implantation_payment_date || deal.closing_date;
+      const { monthKey } = getPaymentDateInfo(baseDate);
       if (monthKey !== selectedMonth) return;
 
       volumeTotal += deal.monthly_value + deal.implantation_value;
@@ -743,7 +746,8 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
   const [expanded, setExpanded] = useState(false);
   const [payDate, setPayDate] = useState(deal.user_payment_date ? deal.user_payment_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
 
-  const { monthKey, expectedPaymentDate } = getPaymentDateInfo(deal.closing_date);
+  const baseDate = deal.first_payment_date || deal.implantation_payment_date || deal.closing_date;
+  const { monthKey, expectedPaymentDate } = getPaymentDateInfo(baseDate);
 
   const bpMeta = globalParams?.meta_apresentacoes_bluepex || 15;
   const bpSuperMeta = globalParams?.super_meta_bluepex || 30;
