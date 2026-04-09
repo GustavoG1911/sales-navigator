@@ -29,21 +29,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchRole = async (userId: string) => {
     try {
+      console.log("[useAuth] Buscando role...");
       const { data, error } = await supabase
         .from("profiles")
         .select("role")
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (!error && data) {
-        const dbRole = data.role as any;
-        if (dbRole === "admin") setRole("admin");
-        else if (dbRole === "gestor") setRole("gestor");
-        else setRole("user");
+      if (data && !error) {
+        setRole(data.role as UserRole);
       } else {
         setRole("user");
       }
     } catch (err) {
+      console.error("[useAuth] Erro na busca de role:", err);
       setRole("user");
     } finally {
       setLoading(false);
@@ -51,33 +50,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // 1. Ouvinte principal de estados de Auth do Supabase
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      console.log("[useAuth] Evento de Auth detetado:", _event);
-      setSession(newSession);
-      
-      if (newSession?.user) {
-        await fetchRole(newSession.user.id);
+    // Safety Timer: Se em 5 segundos nada carregar, libera o app para evitar tela branca
+    const timer = setTimeout(() => {
+      if (loading) {
+        console.warn("[useAuth] Carregamento forçado por timeout!");
+        setLoading(false);
+      }
+    }, 5000);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("[useAuth] Auth state change:", _event);
+      setSession(session);
+      if (session?.user) {
+        fetchRole(session.user.id);
       } else {
+        setLoading(false);
         setRole("user");
+      }
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        fetchRole(session.user.id);
+      } else {
         setLoading(false);
       }
     });
 
-    // 2. Fallback: Se o onAuthStateChange demorar, tenta pegar a sessão inicial
-    const checkInitialSession = async () => {
-      const { data: { session: initialSession } } = await supabase.auth.getSession();
-      if (initialSession && !session) {
-        setSession(initialSession);
-        await fetchRole(initialSession.user.id);
-      } else if (!initialSession) {
-        setLoading(false);
-      }
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
     };
-
-    checkInitialSession();
-
-    return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
