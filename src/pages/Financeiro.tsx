@@ -368,6 +368,55 @@ function FinanceiroContent() {
     });
   }, [salaries, selectedMonth, filtroFuncionario]);
 
+  // KPI Calculations based on filtered lists
+  const kpis = useMemo(() => {
+    const totalFixo = filteredSalaries.reduce((acc, s) => acc + s.amount, 0);
+
+    let totalProjetado = 0;
+    let totalPago = 0;
+    let volumeTotal = 0;
+
+    filteredDeals.forEach((deal) => {
+      // Mensalidade checks
+      if (deal.monthly_value > 0 && deal.first_payment_date && getMonthKey(deal.first_payment_date) === selectedMonth) {
+        volumeTotal += deal.monthly_value;
+        if (deal.is_mensalidade_paid_by_client) {
+          totalPago += deal.monthly_value;
+        } else {
+          totalProjetado += deal.monthly_value;
+        }
+      }
+
+      // Implantação à vista
+      if (deal.implantation_value > 0 && !deal.is_installment && deal.implantation_payment_date && getMonthKey(deal.implantation_payment_date) === selectedMonth) {
+        volumeTotal += deal.implantation_value;
+        if (deal.is_implantacao_paid_by_client) {
+          totalPago += deal.implantation_value;
+        } else {
+          totalProjetado += deal.implantation_value;
+        }
+      }
+
+      // Implantação Parcelada
+      if (deal.is_installment && deal.implantation_value > 0 && Array.isArray(deal.installment_dates)) {
+        const parcelValue = deal.implantation_value / deal.installment_count;
+        deal.installment_dates.forEach((inst: any) => {
+          const dateStr = inst?.date || inst;
+          if (dateStr && getMonthKey(dateStr) === selectedMonth) {
+            volumeTotal += parcelValue;
+            if (inst?.paid === true) {
+              totalPago += parcelValue;
+            } else {
+              totalProjetado += parcelValue;
+            }
+          }
+        });
+      }
+    });
+
+    return { totalFixo, totalProjetado, totalPago, volumeTotal };
+  }, [filteredDeals, filteredSalaries, selectedMonth]);
+
   // Deals with confirmed client payment (ready for payout)
   const payableDeals = useMemo(() => {
     return filteredDeals.filter((d) => d.is_mensalidade_paid_by_client || d.is_implantacao_paid_by_client);
@@ -481,6 +530,52 @@ function FinanceiroContent() {
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card className="bg-card">
+          <CardHeader className="py-3 px-4 pb-0">
+            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
+              Volume Bruto (Mês)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 py-3">
+            <div className="text-xl font-bold tracking-tight">{formatCurrency(kpis.volumeTotal)}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-emerald-500/20">
+          <CardHeader className="py-3 px-4 pb-0">
+            <CardTitle className="text-xs font-semibold text-emerald-600 flex items-center gap-1.5 uppercase tracking-wide">
+              <Check className="h-3.5 w-3.5" /> Pago/Recebido
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 py-3">
+            <div className="text-xl font-bold tracking-tight text-emerald-600">{formatCurrency(kpis.totalPago)}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-yellow-500/20">
+          <CardHeader className="py-3 px-4 pb-0">
+            <CardTitle className="text-xs font-semibold text-yellow-600 flex items-center gap-1.5 uppercase tracking-wide">
+              <ArrowDownToLine className="h-3.5 w-3.5" /> Projetado (Pendente)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 py-3">
+            <div className="text-xl font-bold tracking-tight text-yellow-600">{formatCurrency(kpis.totalProjetado)}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card">
+          <CardHeader className="py-3 px-4 pb-0">
+            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
+              <Wallet className="h-3.5 w-3.5" /> Salários Fixos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 py-3">
+            <div className="text-xl font-bold tracking-tight">{formatCurrency(kpis.totalFixo)}</div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="receivables">
