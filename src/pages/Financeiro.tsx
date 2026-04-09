@@ -409,12 +409,18 @@ function FinanceiroContent() {
   const { data, isLoading: loading } = useQuery({
     queryKey: ["finance-data"],
     queryFn: async () => {
-      const [dealsRes, profilesRes, salariesRes, gpRes] = await Promise.all([
-        supabase.from("deals").select("*").order("closing_date", { ascending: false }),
-        supabase.from("profiles").select("user_id, full_name, display_name, commission_percent"),
-        supabase.from("salary_payments").select("*"),
-        supabase.from("global_parameters").select("*").limit(1).maybeSingle(),
-      ]);
+      const { data: { user } } = await supabase.auth.getUser();
+      const isTestEnv = user?.email?.endsWith("@teste.com") || false;
+
+      let dealsRes = await supabase.from("deals").select("*").eq("is_test_data", isTestEnv).order("closing_date", { ascending: false });
+      let profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent").eq("is_test_data", isTestEnv);
+      const salariesRes = await supabase.from("salary_payments").select("*");
+
+      if (dealsRes.error && (dealsRes.error.message.includes('is_test_data') || dealsRes.error.message.includes('column'))) {
+        console.warn("[Financeiro] Coluna is_test_data ausente. Executando fallback sem filtro.");
+        dealsRes = await supabase.from("deals").select("*").order("closing_date", { ascending: false });
+        profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent");
+      }
 
       if (dealsRes.error) throw dealsRes.error;
       if (profilesRes.error) throw profilesRes.error;
@@ -433,7 +439,6 @@ function FinanceiroContent() {
         deals: dealsRes.data as any[],
         salaries: salariesRes.data as any[],
         profiles: map,
-        globalParams: gpRes.data,
       };
     }
   });
@@ -441,7 +446,6 @@ function FinanceiroContent() {
   const deals = data?.deals || [];
   const salaries = data?.salaries || [];
   const profiles = data?.profiles || {};
-  const globalParams = data?.globalParams || null;
 
   // Filter deals relevant to selected month and cross-filters
   const filteredDeals = useMemo(() => {
@@ -494,10 +498,10 @@ function FinanceiroContent() {
     let totalPago = 0;
     let volumeTotal = 0;
 
-    const bpMeta = globalParams?.meta_apresentacoes_bluepex || 15;
-    const bpSuperMeta = globalParams?.super_meta_bluepex || 30;
-    const opMeta = globalParams?.meta_apresentacoes_opus || 15;
-    const opSuperMeta = globalParams?.super_meta_opus || 30;
+    const bpMeta = 15;
+    const bpSuperMeta = 30;
+    const opMeta = 15;
+    const opSuperMeta = 30;
 
     filteredDeals.forEach((deal) => {
       // Only count if it's due this month according to the cut-off rule
@@ -531,7 +535,7 @@ function FinanceiroContent() {
     });
 
     return { totalFixo, totalProjetado, totalPago, volumeTotal };
-  }, [filteredDeals, filteredSalaries, selectedMonth, globalParams, presentations, profiles]);
+  }, [filteredDeals, filteredSalaries, selectedMonth, presentations, profiles]);
 
   const futureProjections = useMemo(() => {
     const projMap: Record<string, { projectedIn: number, projectedOut: number }> = {};
@@ -543,10 +547,10 @@ function FinanceiroContent() {
         if (!projMap[monthKey]) projMap[monthKey] = { projectedIn: 0, projectedOut: 0 };
         projMap[monthKey].projectedIn += deal.monthly_value + deal.implantation_value;
 
-        const bpMeta = globalParams?.meta_apresentacoes_bluepex || 15;
-        const bpSuperMeta = globalParams?.super_meta_bluepex || 30;
-        const opMeta = globalParams?.meta_apresentacoes_opus || 15;
-        const opSuperMeta = globalParams?.super_meta_opus || 30;
+        const bpMeta = 15;
+        const bpSuperMeta = 30;
+        const opMeta = 15;
+        const opSuperMeta = 30;
 
         const presMonth = presentations[monthKey] || { bluepex: 0, opus: 0 };
         const presCount = deal.operation === "BluePex" ? presMonth.bluepex : presMonth.opus;
@@ -567,7 +571,7 @@ function FinanceiroContent() {
     return Object.entries(projMap)
       .map(([key, vals]) => ({ monthKey: key, ...vals }))
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
-  }, [deals, selectedMonth, globalParams, presentations, profiles]);
+  }, [deals, selectedMonth, presentations, profiles]);
 
   // Deals with confirmed client payment (ready for payout)
   const payableDeals = useMemo(() => {
@@ -796,7 +800,6 @@ function FinanceiroContent() {
             profiles={profiles}
             getUserName={getUserName}
             presentations={presentations}
-            globalParams={globalParams}
             onToggleCommissionPayment={handleToggleCommissionPayment}
             onToggleSalaryPayment={handleToggleSalaryPayment}
           />
@@ -858,10 +861,10 @@ function FinanceiroContent() {
                     })
                     .map((d) => {
                       const commRate = d.commission_rate_snapshot ?? ((profiles[d.user_id]?.commission_percent || 20) / 100);
-                      const bpMeta = globalParams?.meta_apresentacoes_bluepex || 15;
-                      const bpSuperMeta = globalParams?.super_meta_bluepex || 30;
-                      const opMeta = globalParams?.meta_apresentacoes_opus || 15;
-                      const opSuperMeta = globalParams?.super_meta_opus || 30;
+                      const bpMeta = 15;
+                      const bpSuperMeta = 30;
+                      const opMeta = 15;
+                      const opSuperMeta = 30;
                       
                       const monthK = getPaymentDateInfo(d.first_payment_date || d.implantation_payment_date || d.closing_date).monthKey;
                       const presMonth = presentations[monthK] || { bluepex: 0, opus: 0 };
@@ -1109,12 +1112,11 @@ interface PayablesTabProps {
   profiles: ProfileMap;
   getUserName: (id: string) => string;
   presentations: any;
-  globalParams: any;
   onToggleCommissionPayment: (dealId: string, currentStatus: boolean, specificDate?: string) => void;
   onToggleSalaryPayment: (salaryId: string, currentStatus: boolean) => void;
 }
 
-function ExpandableCommissionRow({ deal, profile, getUserName, presentations, globalParams, onToggleCommissionPayment }: any) {
+function ExpandableCommissionRow({ deal, profile, getUserName, presentations, onToggleCommissionPayment }: any) {
   const [expanded, setExpanded] = useState(false);
   const [payDate, setPayDate] = useState(deal.user_payment_date ? deal.user_payment_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
 
@@ -1128,10 +1130,10 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
     expectedPaymentDateStr = format(new Date(info.expectedPaymentDate + "T12:00:00"), "dd/MM/yyyy");
   }
 
-  const bpMeta = globalParams?.meta_apresentacoes_bluepex || 15;
-  const bpSuperMeta = globalParams?.super_meta_bluepex || 30;
-  const opMeta = globalParams?.meta_apresentacoes_opus || 15;
-  const opSuperMeta = globalParams?.super_meta_opus || 30;
+  const bpMeta = 15;
+  const bpSuperMeta = 30;
+  const opMeta = 15;
+  const opSuperMeta = 30;
 
   const presMonth = presentations[monthKey] || { bluepex: 0, opus: 0 };
   const presCount = deal.operation === "BluePex" ? presMonth.bluepex : presMonth.opus;
@@ -1222,7 +1224,7 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
   );
 }
 
-function PayablesTab({ deals, salaries, profiles, getUserName, presentations, globalParams, onToggleCommissionPayment, onToggleSalaryPayment }: PayablesTabProps) {
+function PayablesTab({ deals, salaries, profiles, getUserName, presentations, onToggleCommissionPayment, onToggleSalaryPayment }: PayablesTabProps) {
   return (
     <div className="space-y-5">
       {/* Commissions */}
@@ -1262,7 +1264,6 @@ function PayablesTab({ deals, salaries, profiles, getUserName, presentations, gl
                     profile={profiles[deal.user_id]}
                     getUserName={getUserName}
                     presentations={presentations}
-                    globalParams={globalParams}
                     onToggleCommissionPayment={onToggleCommissionPayment}
                   />
                 ))

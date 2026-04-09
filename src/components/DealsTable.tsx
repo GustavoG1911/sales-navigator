@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, Fragment } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -100,7 +100,7 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                 const comm = calculateCommission(deal, presCount, settings, superMetaActive);
                 const isExpanded = expandedId === deal.id;
                 return (
-                  <div key={deal.id} style={{ display: 'contents' }}>
+                  <Fragment key={deal.id}>
                     <TableRow
                       className="border-border/30 hover:bg-muted/30 cursor-pointer"
                       onClick={() => toggleExpand(deal.id)}
@@ -187,7 +187,7 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                         </TableCell>
                       </TableRow>
                     )}
-                  </div>
+                  </Fragment>
                 );
               })}
             </TableBody>

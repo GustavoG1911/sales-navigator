@@ -39,13 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (profile && !error) {
         setRole(profile.role as UserRole);
       } else {
-        // Fallback: se não encontrar perfil, assume admin para diretor@teste.com para não travar
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user?.email === "diretor@teste.com") {
-          setRole("admin");
-        } else {
-          setRole("user");
-        }
+        setRole("user");
       }
     } catch (err) {
       console.warn("[useAuth] Erro ao carregar role, usando padrão 'user'");

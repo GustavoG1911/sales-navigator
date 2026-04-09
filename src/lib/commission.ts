@@ -27,19 +27,13 @@ export function calculateCommission(
   deal: Deal,
   presentationsForOperation: number,
   settings?: AppSettings,
-  _superMetaActive?: boolean, // kept for backward compat, now ignored
-  globalParams?: GlobalParameters
+  _superMetaActive?: boolean // kept for backward compat, now ignored
 ): CommissionBreakdown {
   const rate = settings?.commissionRate ?? DEFAULT_COMMISSION_RATE;
 
-  // Get per-operation thresholds from global params
-  const metaThreshold = deal.operation === "BluePex"
-    ? (globalParams?.meta_apresentacoes_bluepex ?? 15)
-    : (globalParams?.meta_apresentacoes_opus ?? 15);
-
-  const superMetaThreshold = deal.operation === "BluePex"
-    ? (globalParams?.super_meta_bluepex ?? 30)
-    : (globalParams?.super_meta_opus ?? 30);
+  // Use strict fixed volumetry as requested
+  const metaThreshold = 15;
+  const superMetaThreshold = 30;
 
   const tier = getCommissionTier(presentationsForOperation, metaThreshold, superMetaThreshold);
   const baseRate = Math.min(tier.rate, 1.0); // base is capped at 1.0 for the monthly calc

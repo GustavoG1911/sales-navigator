@@ -12,7 +12,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Users, SlidersHorizontal, Save, Shield, UserCog, User, Loader2 } from "lucide-react";
+import { Users, Save, Shield, UserCog, User, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
@@ -36,12 +36,6 @@ export default function Settings() {
             Meu Perfil
           </TabsTrigger>
           {role === "admin" && (
-            <>
-              <TabsTrigger value="params" className="text-xs gap-1.5">
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                Parâmetros Globais
-              </TabsTrigger>
-              <TabsTrigger value="team" className="text-xs gap-1.5">
                 <Users className="h-3.5 w-3.5" />
                 Gestão de Equipe
               </TabsTrigger>
@@ -53,14 +47,10 @@ export default function Settings() {
           <ProfileTab />
         </TabsContent>
         {role === "admin" && (
-          <>
-            <TabsContent value="params">
-              <GlobalParamsTab />
-            </TabsContent>
-            <TabsContent value="team">
+          <TabsContent value="team">
               <TeamTab />
             </TabsContent>
-          </>
+          </TabsContent>
         )}
       </Tabs>
     </div>
@@ -209,135 +199,7 @@ function ProfileTab() {
   );
 }
 
-interface GlobalParamsState {
-  id: string;
-  meta_apresentacoes_bluepex: number;
-  meta_apresentacoes_opus: number;
-  super_meta_bluepex: number;
-  super_meta_opus: number;
-  base_implantacao: number;
-  acelerador_teto: number;
-  acelerador_piso: number;
-}
 
-function GlobalParamsTab() {
-  const [params, setParams] = useState<GlobalParamsState | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    supabase
-      .from("global_parameters")
-      .select("*")
-      .limit(1)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (data) {
-          setParams({
-            id: data.id,
-            meta_apresentacoes_bluepex: data.meta_apresentacoes_bluepex ?? 15,
-            meta_apresentacoes_opus: data.meta_apresentacoes_opus ?? 15,
-            super_meta_bluepex: data.super_meta_bluepex ?? 30,
-            super_meta_opus: data.super_meta_opus ?? 30,
-            base_implantacao: data.base_implantacao ?? 40,
-            acelerador_teto: data.acelerador_teto ?? 100,
-            acelerador_piso: data.acelerador_piso ?? 70,
-          });
-        }
-        if (error) toast.error("Erro ao carregar parâmetros");
-        setLoading(false);
-      });
-  }, []);
-
-  const handleSave = async () => {
-    if (!params) return;
-    setSaving(true);
-    const { error } = await supabase
-      .from("global_parameters")
-      .update({
-        meta_apresentacoes_bluepex: params.meta_apresentacoes_bluepex,
-        meta_apresentacoes_opus: params.meta_apresentacoes_opus,
-        super_meta_bluepex: params.super_meta_bluepex,
-        super_meta_opus: params.super_meta_opus,
-        base_implantacao: params.base_implantacao,
-        acelerador_teto: params.acelerador_teto,
-        acelerador_piso: params.acelerador_piso,
-      })
-      .eq("id", params.id);
-    setSaving(false);
-    if (error) {
-      toast.error("Erro ao salvar: " + error.message);
-      return;
-    }
-    toast.success("Parâmetros salvos!");
-  };
-
-  if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
-  if (!params) return <p className="text-sm text-muted-foreground">Nenhum parâmetro encontrado.</p>;
-
-  return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <CardTitle className="text-sm flex items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-primary" />
-          Parâmetros Globais
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <div>
-          <p className="text-xs font-semibold text-blue-500 mb-2">BluePex</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Meta de Apresentações</Label>
-              <Input type="number" min="1" value={params.meta_apresentacoes_bluepex} onChange={(e) => setParams({ ...params, meta_apresentacoes_bluepex: Number(e.target.value) })} className="font-mono" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Super Meta</Label>
-              <Input type="number" min="1" value={params.super_meta_bluepex} onChange={(e) => setParams({ ...params, super_meta_bluepex: Number(e.target.value) })} className="font-mono" />
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <p className="text-xs font-semibold text-purple-500 mb-2">Opus Tech</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Meta de Apresentações</Label>
-              <Input type="number" min="1" value={params.meta_apresentacoes_opus} onChange={(e) => setParams({ ...params, meta_apresentacoes_opus: Number(e.target.value) })} className="font-mono" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Super Meta</Label>
-              <Input type="number" min="1" value={params.super_meta_opus} onChange={(e) => setParams({ ...params, super_meta_opus: Number(e.target.value) })} className="font-mono" />
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground mb-2">Bases & Aceleradores</p>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Base Implantação (%)</Label>
-              <Input type="number" min="0" max="100" value={params.base_implantacao} onChange={(e) => setParams({ ...params, base_implantacao: Number(e.target.value) })} className="font-mono" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Acelerador Piso (%)</Label>
-              <Input type="number" min="0" max="100" value={params.acelerador_piso} onChange={(e) => setParams({ ...params, acelerador_piso: Number(e.target.value) })} className="font-mono" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Acelerador Teto (%)</Label>
-              <Input type="number" min="0" max="100" value={params.acelerador_teto} onChange={(e) => setParams({ ...params, acelerador_teto: Number(e.target.value) })} className="font-mono" />
-            </div>
-          </div>
-        </div>
-
-        <Button onClick={handleSave} disabled={saving} className="w-full">
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? "Salvando..." : "Salvar Parâmetros"}
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
 
 function TeamTab() {
   const [profiles, setProfiles] = useState<any[]>([]);

@@ -13,7 +13,7 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { PeriodFilter, DateRange, PeriodType } from "@/components/PeriodFilter";
 import { calculateCommission, formatCurrency, getMonthKey, formatMonthLabel, getPresentationsForDeal } from "@/lib/commission";
 import { downloadReportPDF, printReport } from "@/lib/report";
-import { Deal, PaymentStatus, GlobalParameters } from "@/lib/types";
+import { Deal, PaymentStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,29 +27,7 @@ export default function Index() {
   const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, adjustments, updateAdjustment, refreshDeals } = useAppData();
   const { signOut, role, user } = useAuth();
 
-  const [globalParams, setGlobalParams] = useState<GlobalParameters | undefined>(undefined);
-
-  useEffect(() => {
-    supabase
-      .from("global_parameters")
-      .select("*")
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setGlobalParams({
-            id: data.id,
-            meta_apresentacoes_bluepex: data.meta_apresentacoes_bluepex ?? 15,
-            meta_apresentacoes_opus: data.meta_apresentacoes_opus ?? 15,
-            super_meta_bluepex: data.super_meta_bluepex ?? 30,
-            super_meta_opus: data.super_meta_opus ?? 30,
-            base_implantacao: data.base_implantacao ?? 40,
-            acelerador_teto: data.acelerador_teto ?? 100,
-            acelerador_piso: data.acelerador_piso ?? 70,
-          });
-        }
-      });
-  }, []);
+  // globalParams eradicated
 
   const currentMonthKey = getMonthKey(new Date());
   const now = new Date();
@@ -154,13 +132,13 @@ export default function Index() {
     let paid = 0;
     filteredDeals.forEach((deal) => {
       const presCount = getPresentationsForDeal(deal, presentations);
-      const comm = calculateCommission(deal, presCount, settings, false, globalParams);
+      const comm = calculateCommission(deal, presCount, settings, false);
       projected += comm.totalCommission;
       if (deal.paymentStatus === "Pago") paid += comm.totalCommission;
     });
     const totalPres = currentMonthPres.bluepex + currentMonthPres.opus;
     return { salary: settings.fixedSalary, projected, paid, total: settings.fixedSalary + paid, presentations: totalPres };
-  }, [filteredDeals, presentations, settings, globalParams, currentMonthPres]);
+  }, [filteredDeals, presentations, settings, currentMonthPres]);
 
   const handleStatusChange = (deal: Deal, status: PaymentStatus) => {
     addOrUpdateDeal({ ...deal, paymentStatus: status });
