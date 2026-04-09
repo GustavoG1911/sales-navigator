@@ -21,6 +21,7 @@ const dbToDeal = (db: any): Deal => ({
 });
 
 const dealToDb = (deal: Partial<Deal>) => ({
+  id: deal.id,
   client_name: deal.clientName,
   operation: deal.operation,
   closing_date: deal.closingDate,
@@ -35,6 +36,7 @@ const dealToDb = (deal: Partial<Deal>) => ({
   first_payment_date: deal.firstPaymentDate,
   commission_amount_snapshot: deal.commissionAmountSnapshot,
   commission_rate_snapshot: deal.commissionRateSnapshot,
+  payment_status: deal.paymentStatus,
 });
 
 export async function fetchDeals(role: UserRole, userId?: string): Promise<Deal[]> {

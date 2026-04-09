@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAppData } from "@/hooks/useAppData";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchAvailableYears } from "@/lib/supabase-deals";
@@ -25,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 
 export default function Index() {
+  const queryClient = useQueryClient();
   const { signOut, role, user } = useAuth();
   const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment, refreshDeals } = useAppData(role, user?.id);
 
@@ -158,8 +160,9 @@ export default function Index() {
     return { salary: settings.fixedSalary, projected, paid, total: settings.fixedSalary + paid, presentations: totalPres };
   }, [filteredDeals, presentations, settings, currentMonthPres, isSingleMonth, dateRange]);
 
-  const handleStatusChange = (deal: Deal, status: PaymentStatus) => {
-    addOrUpdateDeal({ ...deal, paymentStatus: status });
+  const handleStatusChange = async (deal: Deal, status: PaymentStatus) => {
+    await addOrUpdateDeal({ ...deal, paymentStatus: status });
+    queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
   const detailDeals = useMemo(() => {

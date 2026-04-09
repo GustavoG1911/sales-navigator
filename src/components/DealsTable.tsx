@@ -137,7 +137,7 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                         <>
                           <TableCell className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                             <Select
-                              value={deal.paymentStatus}
+                              value={deal.paymentStatus || "Pendente"}
                               onValueChange={(v) => onStatusChange(deal, v as PaymentStatus)}
                             >
                               <SelectTrigger className="h-7 w-[100px] text-xs ml-auto">
