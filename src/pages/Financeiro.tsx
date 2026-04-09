@@ -163,8 +163,13 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
       const { data: { user } } = await supabase.auth.getUser();
       const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
-      const [dealsRes, salariesRes, profilesRes] = await Promise.all([
-        supabase.from("deals").select("*").eq("user_id", userId).eq("is_test_data", isTestEnv).order("closing_date", { ascending: false }),
+      // Tenta com filtro is_test_data; fallback se coluna não existir
+      let dealsRes = await supabase.from("deals").select("*").eq("user_id", userId).eq("is_test_data", isTestEnv).order("closing_date", { ascending: false });
+      if (dealsRes.error && dealsRes.error.message?.includes("is_test_data")) {
+        dealsRes = await supabase.from("deals").select("*").eq("user_id", userId).order("closing_date", { ascending: false });
+      }
+
+      const [salariesRes, profilesRes] = await Promise.all([
         supabase.from("salary_payments").select("*").eq("user_id", userId),
         supabase.from("profiles").select("user_id, full_name, display_name, commission_percent").eq("user_id", userId),
       ]);
@@ -415,10 +420,19 @@ function FinanceiroContent() {
       const { data: { user } } = await supabase.auth.getUser();
       const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
-      const [dealsRes, salariesRes, profilesRes, gpRes] = await Promise.all([
-        supabase.from("deals").select("*").eq("is_test_data", isTestEnv).order("closing_date", { ascending: false }),
+      // Tenta com filtro is_test_data; fallback se coluna não existir
+      let dealsRes = await supabase.from("deals").select("*").eq("is_test_data", isTestEnv).order("closing_date", { ascending: false });
+      if (dealsRes.error && dealsRes.error.message?.includes("is_test_data")) {
+        dealsRes = await supabase.from("deals").select("*").order("closing_date", { ascending: false });
+      }
+
+      let profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent").eq("is_test_data", isTestEnv);
+      if (profilesRes.error && profilesRes.error.message?.includes("is_test_data")) {
+        profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent");
+      }
+
+      const [salariesRes, gpRes] = await Promise.all([
         supabase.from("salary_payments").select("*"),
-        supabase.from("profiles").select("user_id, full_name, display_name, commission_percent").eq("is_test_data", isTestEnv),
         supabase.from("global_parameters").select("*").limit(1).maybeSingle(),
       ]);
 

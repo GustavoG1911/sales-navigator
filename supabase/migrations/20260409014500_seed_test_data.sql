@@ -5,7 +5,6 @@
 -- Ele cria a coluna de isolamento, os auth users e popula 50 deals.
 -- ═══════════════════════════════════════════════════════════════
 
--- ─── MIGRATION: Adicionar coluna de isolamento ───
 ALTER TABLE deals ADD COLUMN IF NOT EXISTS is_test_data boolean DEFAULT false;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_test_data boolean DEFAULT false;
 
@@ -93,9 +92,9 @@ VALUES (
 -- ─── STEP 2: Criar Profiles de Teste (is_test_data = true) ───
 INSERT INTO profiles (user_id, full_name, display_name, role, commission_percent, fixed_salary, job_title, is_test_data)
 VALUES
-  ('aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0001', 'Ricardo Diretor (Teste)', 'Ricardo Diretor', 'admin', 0, 8000, 'Diretor Comercial', true),
-  ('aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0002', 'Carlos Executivo (Teste)', 'Carlos Executivo', 'gestor', 15, 5000, 'Gestor de Operações', true),
-  ('aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0003', 'Ana SDR (Teste)', 'Ana SDR', 'user', 10, 2500, 'SDR - Sales Development', true)
+  ('aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0001', 'Ricardo Diretor (Teste)', 'Ricardo Diretor', 'admin', 0, 8000, 'Diretor', true),
+  ('aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0002', 'Carlos Executivo (Teste)', 'Carlos Executivo', 'user', 15, 5000, 'Executivo de Negócios', true),
+  ('aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0003', 'Ana SDR (Teste)', 'Ana SDR', 'user', 10, 2500, 'SDR', true)
 ON CONFLICT (user_id) DO UPDATE SET
   full_name = EXCLUDED.full_name,
   display_name = EXCLUDED.display_name,

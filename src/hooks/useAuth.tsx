@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-export type UserRole = "admin" | "gestor" | "sdr";
+export type UserRole = "admin" | "gestor" | "user";
 
 interface AuthContextType {
   session: Session | null;
@@ -16,7 +16,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
   loading: true,
-  role: "sdr",
+  role: "user",
   signOut: async () => {},
 });
 
@@ -25,18 +25,39 @@ export const useAuth = () => useContext(AuthContext);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<UserRole>("admin");
+  const [role, setRole] = useState<UserRole>("user");
 
   const fetchRole = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("user_id", userId)
-      .single();
-    if (data?.role === "admin") {
-      setRole("admin");
-    } else {
-      setRole("sdr");
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("[useAuth] Erro ao buscar perfil:", error.message, error.details, error.hint);
+        setRole("user");
+        return;
+      }
+
+      if (!data) {
+        console.warn("[useAuth] Nenhum perfil encontrado para user_id:", userId);
+        setRole("user");
+        return;
+      }
+
+      const dbRole = data.role as string;
+      if (dbRole === "admin") {
+        setRole("admin");
+      } else if (dbRole === "gestor") {
+        setRole("gestor");
+      } else {
+        setRole("user");
+      }
+    } catch (err) {
+      console.error("[useAuth] Exceção inesperada ao buscar role:", err);
+      setRole("user");
     }
   };
 
@@ -46,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         fetchRole(session.user.id);
       } else {
-        setRole("sdr");
+        setRole("user");
       }
       setLoading(false);
     });

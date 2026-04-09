@@ -73,14 +73,23 @@ export async function fetchDeals(): Promise<Deal[]> {
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
-  const { data, error } = await supabase
+  // Tenta com filtro de isolamento; se a coluna não existir ainda, faz fallback sem filtro
+  let result = await supabase
     .from("deals" as any)
     .select("*")
     .eq("is_test_data", isTestEnv)
     .order("closing_date", { ascending: false });
 
-  if (error) throw error;
-  return ((data as any[]) || []).map(dbToDeal);
+  if (result.error && result.error.message?.includes("is_test_data")) {
+    console.warn("[fetchDeals] Coluna is_test_data não encontrada, buscando sem filtro de ambiente.");
+    result = await supabase
+      .from("deals" as any)
+      .select("*")
+      .order("closing_date", { ascending: false });
+  }
+
+  if (result.error) throw result.error;
+  return ((result.data as any[]) || []).map(dbToDeal);
 }
 
 export async function upsertDeal(deal: Deal): Promise<Deal> {

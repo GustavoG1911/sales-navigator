@@ -79,13 +79,18 @@ export default function Index() {
   useEffect(() => {
     if (role === "admin" || role === "gestor") {
       const isTestEnv = user?.email?.endsWith("@teste.com") || false;
-      supabase.from("profiles").select("user_id, full_name").eq("is_test_data", isTestEnv).then(({ data }) => {
-        if (data) {
+      const loadProfiles = async () => {
+        let res = await supabase.from("profiles").select("user_id, full_name").eq("is_test_data", isTestEnv);
+        if (res.error && res.error.message?.includes("is_test_data")) {
+          res = await supabase.from("profiles").select("user_id, full_name");
+        }
+        if (res.data) {
           const map: any = {};
-          data.forEach(p => map[p.user_id] = p.full_name);
+          res.data.forEach(p => map[p.user_id] = p.full_name);
           setProfiles(map);
         }
-      });
+      };
+      loadProfiles();
     }
   }, [role, user]);
 

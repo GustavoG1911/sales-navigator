@@ -3,14 +3,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Save, User } from "lucide-react";
 
+const CARGO_OPTIONS = [
+  { value: "diretor", label: "Diretor", role: "admin" },
+  { value: "executivo", label: "Executivo de Negócios", role: "user" },
+  { value: "sdr", label: "SDR", role: "user" },
+] as const;
+
 interface ProfileData {
   full_name: string;
-  job_title: string;
+  cargo: string;
   fixed_salary: number;
   commission_percent: number;
 }
@@ -27,7 +34,7 @@ export function OnboardingModal({ forceOpen, onClose }: OnboardingModalProps) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ProfileData>({
     full_name: "",
-    job_title: "",
+    cargo: "",
     fixed_salary: 0,
     commission_percent: 20,
   });
@@ -46,20 +53,27 @@ export function OnboardingModal({ forceOpen, onClose }: OnboardingModalProps) {
   }, [forceOpen]);
 
   const checkProfile = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
-      .select("full_name, job_title, fixed_salary, commission_percent")
+      .select("full_name, role, job_title, fixed_salary, commission_percent")
       .eq("user_id", user!.id)
       .maybeSingle();
 
+    if (error) {
+      console.error("[Onboarding] Erro ao verificar perfil:", error.message);
+    }
+
     if (data) {
+      // Mapear role do DB de volta para cargo do dropdown
+      const cargoFromRole = data.role === "admin" ? "diretor" : 
+        (data.job_title?.toLowerCase()?.includes("sdr") ? "sdr" : "executivo");
       setForm({
         full_name: data.full_name || "",
-        job_title: data.job_title || "",
+        cargo: cargoFromRole || "",
         fixed_salary: data.fixed_salary || 0,
         commission_percent: data.commission_percent || 20,
       });
-      if (!data.full_name || !data.job_title) {
+      if (!data.full_name || !data.role) {
         setIsForced(true);
         setOpen(true);
       }
@@ -73,14 +87,16 @@ export function OnboardingModal({ forceOpen, onClose }: OnboardingModalProps) {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("full_name, job_title, fixed_salary, commission_percent")
+      .select("full_name, role, job_title, fixed_salary, commission_percent")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (data) {
+      const cargoFromRole = data.role === "admin" ? "diretor" : 
+        (data.job_title?.toLowerCase()?.includes("sdr") ? "sdr" : "executivo");
       setForm({
         full_name: data.full_name || "",
-        job_title: data.job_title || "",
+        cargo: cargoFromRole || "",
         fixed_salary: data.fixed_salary || 0,
         commission_percent: data.commission_percent || 20,
       });
@@ -89,16 +105,20 @@ export function OnboardingModal({ forceOpen, onClose }: OnboardingModalProps) {
 
   const handleSave = async () => {
     if (!user) return;
-    if (!form.full_name.trim() || !form.job_title.trim()) {
+    if (!form.full_name.trim() || !form.cargo) {
       toast.error("Nome e Cargo são obrigatórios.");
       return;
     }
+    const selectedCargo = CARGO_OPTIONS.find(c => c.value === form.cargo);
+    const dbRole = selectedCargo?.role || "user";
+    const jobTitle = selectedCargo?.label || form.cargo;
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
       .update({
         full_name: form.full_name.trim(),
-        job_title: form.job_title.trim(),
+        role: dbRole,
+        job_title: jobTitle,
         fixed_salary: form.fixed_salary,
         commission_percent: form.commission_percent,
       })
@@ -106,6 +126,7 @@ export function OnboardingModal({ forceOpen, onClose }: OnboardingModalProps) {
 
     setSaving(false);
     if (error) {
+      console.error("[Onboarding] Erro ao salvar:", error);
       toast.error("Erro ao salvar perfil: " + error.message);
       return;
     }
@@ -153,11 +174,18 @@ export function OnboardingModal({ forceOpen, onClose }: OnboardingModalProps) {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Cargo *</Label>
-            <Input
-              value={form.job_title}
-              onChange={(e) => setForm({ ...form, job_title: e.target.value })}
-              placeholder="Ex: SDR, Closer, Gerente"
-            />
+            <Select value={form.cargo} onValueChange={(v) => setForm({ ...form, cargo: v })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione seu cargo" />
+              </SelectTrigger>
+              <SelectContent>
+                {CARGO_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
