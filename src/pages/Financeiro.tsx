@@ -417,8 +417,8 @@ function FinanceiroContent() {
       ]);
 
       if (dealsRes.error) throw dealsRes.error;
-      if (salariesRes.error) throw salariesRes.error;
       if (profilesRes.error) throw profilesRes.error;
+      if (salariesRes.error) throw salariesRes.error;
 
       const map: ProfileMap = {};
       (profilesRes.data as any[]).forEach((p) => {
