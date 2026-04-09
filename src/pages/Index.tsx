@@ -180,35 +180,53 @@ export default function Index() {
   }, [isSingleMonth, chartTimeline]);
 
   const kpis = useMemo(() => {
-    let projected = 0;
-    let paid = 0;
-    financialDeals.forEach((deal) => {
+    let totalComissoes = 0;
+    let totalVolumeBruto = 0;
+
+    financialDeals.forEach(deal => {
+      totalVolumeBruto += (deal.monthlyValue || 0) + (deal.implantationValue || 0);
       const presCount = getPresentationsForDeal(deal, presentations);
       const comm = calculateCommission(deal, presCount, settings, false);
-      projected += comm.totalCommission;
-      if (deal.paymentStatus === "Pago") paid += comm.totalCommission;
+      totalComissoes += comm.totalCommission;
     });
 
-    let totalVolume = 0;
-    closedDeals.forEach((d) => {
-      totalVolume += (d.monthlyValue + d.implantationValue);
-    });
+    const ticketMedio = financialDeals.length > 0 ? totalVolumeBruto / financialDeals.length : 0;
 
-    let totalPres = 0;
-    if (isSingleMonth) {
-      totalPres = currentMonthPres.bluepex + currentMonthPres.opus;
-    } else {
-      let start = new Date(dateRange.from);
-      const end = new Date(dateRange.to);
-      while (start <= end) {
-        const key = getMonthKey(start);
-        const p = presentations[key];
-        if (p) totalPres += (p.bluepex + p.opus);
-        start.setMonth(start.getMonth() + 1);
+    return [
+      {
+        title: "Comissões Projetadas",
+        value: totalComissoes,
+        type: "currency" as const,
+        icon: TrendingUp,
+        variant: "primary" as const,
+        modalType: "projected" as "projected" | "paid" | "deals" | null
+      },
+      {
+        title: "Volume Bruto Vendido",
+        value: totalVolumeBruto,
+        type: "currency" as const,
+        icon: DollarSign,
+        variant: "warning" as const,
+        modalType: "deals" as "projected" | "paid" | "deals" | null
+      },
+      {
+        title: "Fechamentos",
+        value: financialDeals.length,
+        type: "number" as const,
+        icon: BarChart3,
+        variant: "success" as const,
+        modalType: "deals" as "projected" | "paid" | "deals" | null
+      },
+      {
+        title: "Ticket Médio",
+        value: ticketMedio,
+        type: "currency" as const,
+        icon: BadgeDollarSign,
+        variant: "primary" as const,
+        modalType: null
       }
-    }
-    return { salary: settings.fixedSalary, projected, paid, totalVolume, presentations: totalPres };
-  }, [financialDeals, closedDeals, presentations, settings, currentMonthPres, isSingleMonth, dateRange]);
+    ];
+  }, [financialDeals, presentations, settings]);
 
   const handleStatusChange = async (deal: Deal, status: PaymentStatus) => {
     await addOrUpdateDeal({ ...deal, paymentStatus: status });
@@ -351,40 +369,19 @@ export default function Index() {
 
           <div>
             <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold flex items-center gap-2">
-              Comissões geradas no período
+              KPIs de Performance {periodSuffix}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <KpiCard 
-                title={`FECHAMENTOS ${periodSuffix.toUpperCase()}`}
-                value={filteredDeals.length.toString()} 
-                icon={BarChart3} 
-                onClick={() => setKpiModalType("deals")}
-                tooltip="Volume de negócios concretizados no período selecionado."
-              />
-              <KpiCard 
-                title={`Projetada ${periodSuffix}`} 
-                value={formatCurrency(kpis.projected)} 
-                icon={TrendingUp} 
-                variant="primary" 
-                onClick={() => setKpiModalType("projected")}
-                tooltip="Soma das comissões e implantações de negócios fechados no período que ainda não foram pagos."
-              />
-              <KpiCard 
-                title={`Paga ${periodSuffix}`} 
-                value={formatCurrency(kpis.paid)} 
-                icon={BadgeDollarSign} 
-                variant="success" 
-                onClick={() => setKpiModalType("paid")}
-                tooltip="Soma das comissões e implantações que já constam como recebidas/pagas."
-              />
-              <KpiCard 
-                title={`VOLUME ${periodSuffix.toUpperCase()}`} 
-                value={formatCurrency(kpis.totalVolume)} 
-                icon={DollarSign} 
-                variant="warning" 
-                onClick={() => setKpiModalType("deals")}
-                tooltip="Valor total bruto (Mensalidade + Implantação) dos negócios fechados no período."
-              />
+              {kpis.map((kpi, idx) => (
+                <KpiCard 
+                  key={idx}
+                  title={kpi.title}
+                  value={kpi.type === "currency" ? formatCurrency(kpi.value) : kpi.value.toString()}
+                  icon={kpi.icon}
+                  variant={kpi.variant}
+                  onClick={kpi.modalType ? () => setKpiModalType(kpi.modalType) : undefined}
+                />
+              ))}
             </div>
           </div>
 
