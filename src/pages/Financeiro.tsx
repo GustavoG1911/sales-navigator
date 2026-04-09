@@ -250,6 +250,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30">
+                  <TableHead className="text-[11px]">Origem</TableHead>
                   <TableHead className="text-[11px] text-right">Valor</TableHead>
                   <TableHead className="text-[11px]">Vencimento</TableHead>
                   <TableHead className="text-[11px] text-center">Status</TableHead>
@@ -258,13 +259,16 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
               <TableBody>
                 {filteredSalaries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">
+                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">
                       Nenhum salário registrado para este mês.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredSalaries.map((s) => (
                     <TableRow key={s.id}>
+                      <TableCell>
+                        <Badge variant="secondary" className="text-[9px] uppercase">BDtech</Badge>
+                      </TableCell>
                       <TableCell className="text-right text-sm font-mono">{formatCurrency(s.amount)}</TableCell>
                       <TableCell className="text-sm">{new Date(s.expected_payment_date + "T12:00:00").toLocaleDateString("pt-BR")}</TableCell>
                       <TableCell className="text-center">
