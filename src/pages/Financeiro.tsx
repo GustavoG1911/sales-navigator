@@ -291,6 +291,9 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
 function FinanceiroContent() {
   const currentMonthKey = getMonthKey(new Date());
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+  const [filtroOperacao, setFiltroOperacao] = useState("Todas");
+  const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
+  
   const monthOptions = useMemo(() => buildMonthOptions(), []);
 
   const [deals, setDeals] = useState<DealRow[]>([]);
@@ -332,13 +335,12 @@ function FinanceiroContent() {
     loadData();
   }, []);
 
-  // Filter deals relevant to selected month
+  // Filter deals relevant to selected month and cross-filters
   const filteredDeals = useMemo(() => {
     return deals.filter((d) => {
-      // Check if first_payment_date or implantation_payment_date falls in selected month
+      // Month
       const fpKey = d.first_payment_date ? getMonthKey(d.first_payment_date) : null;
       const ipKey = d.implantation_payment_date ? getMonthKey(d.implantation_payment_date) : null;
-      // Also check installment dates
       let hasInstallmentInMonth = false;
       if (d.is_installment && Array.isArray(d.installment_dates)) {
         hasInstallmentInMonth = d.installment_dates.some((inst: any) => {
@@ -346,13 +348,25 @@ function FinanceiroContent() {
           return dateStr && getMonthKey(dateStr) === selectedMonth;
         });
       }
-      return fpKey === selectedMonth || ipKey === selectedMonth || hasInstallmentInMonth;
+      const passMonth = fpKey === selectedMonth || ipKey === selectedMonth || hasInstallmentInMonth;
+
+      // Operation
+      const passOp = filtroOperacao === "Todas" || d.operation === filtroOperacao;
+
+      // User
+      const passUser = filtroFuncionario === "Todos" || d.user_id === filtroFuncionario;
+
+      return passMonth && passOp && passUser;
     });
-  }, [deals, selectedMonth]);
+  }, [deals, selectedMonth, filtroOperacao, filtroFuncionario]);
 
   const filteredSalaries = useMemo(() => {
-    return salaries.filter((s) => getMonthKey(s.reference_month) === selectedMonth);
-  }, [salaries, selectedMonth]);
+    return salaries.filter((s) => {
+      const passMonth = getMonthKey(s.reference_month) === selectedMonth;
+      const passUser = filtroFuncionario === "Todos" || s.user_id === filtroFuncionario;
+      return passMonth && passUser;
+    });
+  }, [salaries, selectedMonth, filtroFuncionario]);
 
   // Deals with confirmed client payment (ready for payout)
   const payableDeals = useMemo(() => {
@@ -427,20 +441,46 @@ function FinanceiroContent() {
 
   return (
     <div className="container py-5">
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="text-lg font-semibold">Financeiro</h2>
-        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {monthOptions.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-5">
+        <h2 className="text-lg font-semibold whitespace-nowrap">Torre de Controle</h2>
+        
+        <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
+          <Select value={filtroOperacao} onValueChange={setFiltroOperacao}>
+            <SelectTrigger className="w-[140px] md:w-[160px] h-8 text-xs">
+              <SelectValue placeholder="Operação" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Todas">Todas Operações</SelectItem>
+              <SelectItem value="BluePex">BluePex</SelectItem>
+              <SelectItem value="Opus Tech">Opus Tech</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={filtroFuncionario} onValueChange={setFiltroFuncionario}>
+            <SelectTrigger className="w-[140px] md:w-[160px] h-8 text-xs">
+              <SelectValue placeholder="Funcionário" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Todos">Todos Funcionários</SelectItem>
+              {Object.entries(profiles).map(([id, p]) => (
+                <SelectItem key={id} value={id}>{p.full_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-[140px] md:w-[160px] h-8 text-xs">
+              <SelectValue placeholder="Mês Referência" />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Tabs defaultValue="receivables">
