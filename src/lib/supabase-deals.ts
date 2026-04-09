@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Deal, PaymentStatus } from "./types";
+import { Deal, PaymentStatus, MonthlyPresentations } from "./types";
 import { UserRole } from "@/hooks/useAuth";
 
 const dbToDeal = (db: any): Deal => ({
@@ -9,15 +9,21 @@ const dbToDeal = (db: any): Deal => ({
   closingDate: db.closing_date,
   implantationValue: db.implantation_value,
   monthlyValue: db.monthly_value,
-  isImplantacao_paid_by_client: db.is_implantacao_paid_by_client,
+  isImplantacaoPaid: db.is_implantacao_paid,
+  isMensalidadePaid: db.is_mensalidade_paid,
   isMensalidadePaidByClient: db.is_mensalidade_paid_by_client,
   isPaidToUser: db.is_paid_to_user,
   isUserConfirmedPayment: db.is_user_confirmed_payment,
   userId: db.user_id,
   implantationPaymentDate: db.implantation_payment_date,
   firstPaymentDate: db.first_payment_date,
-  commission_amount_snapshot: db.commission_amount_snapshot,
-  commission_rate_snapshot: db.commission_rate_snapshot,
+  commissionRateSnapshot: db.commission_rate_snapshot,
+  commissionAmountSnapshot: db.commission_amount_snapshot,
+  isTestData: db.is_test_data,
+  isInstallment: db.is_installment || false,
+  installmentCount: db.installment_count || 0,
+  installmentDates: db.installment_dates || [],
+  paymentStatus: db.payment_status || "Pendente",
 });
 
 const dealToDb = (deal: Partial<Deal>) => ({
@@ -27,16 +33,21 @@ const dealToDb = (deal: Partial<Deal>) => ({
   closing_date: deal.closingDate,
   implantation_value: deal.implantationValue,
   monthly_value: deal.monthlyValue,
-  is_implantacao_paid_by_client: deal.isImplantationPaidByClient,
-  is_mensalidade_paid_by_client: deal.isMensalidadePaidByClient,
+  is_implantacao_paid: deal.isImplantacaoPaid,
+  is_mensalidade_paid: deal.isMensalidadePaid,
   is_paid_to_user: deal.isPaidToUser,
   is_user_confirmed_payment: deal.isUserConfirmedPayment,
+  is_mensalidade_paid_by_client: deal.isMensalidadePaidByClient,
+  is_installment: deal.isInstallment,
+  installment_count: deal.installmentCount,
+  installment_dates: deal.installmentDates,
   user_id: deal.userId,
   implantation_payment_date: deal.implantationPaymentDate,
   first_payment_date: deal.firstPaymentDate,
   commission_amount_snapshot: deal.commissionAmountSnapshot,
   commission_rate_snapshot: deal.commissionRateSnapshot,
   payment_status: deal.paymentStatus,
+  is_test_data: deal.isTestData,
 });
 
 export async function fetchDeals(role: UserRole, userId?: string): Promise<Deal[]> {
@@ -45,15 +56,13 @@ export async function fetchDeals(role: UserRole, userId?: string): Promise<Deal[
   
   console.log(`[fetchDeals] Buscando dados para ambiente: ${isTestEnv ? "TESTE 🧪" : "PRODUÇÃO 🚀"} (User: ${user?.email}, Role: ${role})`);
 
-  let query = supabase
+  let query = (supabase as any)
     .from("deals")
     .select("*")
     .eq("is_test_data", isTestEnv);
 
   // Filtro de segurança: Se não for admin, vê apenas o dele
   if (role !== "admin") {
-    // Se não for admin, OBRIGATORIAMENTE filtra pelo userId logado
-    // Se userId for nulo por algum motivo, não retorna nada (segurança)
     query = query.eq("user_id", userId || "no-access-placeholder");
   }
 
@@ -62,7 +71,7 @@ export async function fetchDeals(role: UserRole, userId?: string): Promise<Deal[
   if (res.error) {
     console.error("[fetchDeals] Erro na busca principal:", res.error);
     // Fallback: busca sem filtro se der erro de coluna
-    let fallbackQuery = supabase.from("deals").select("*");
+    let fallbackQuery = (supabase as any).from("deals").select("*");
     if (role !== "admin") {
       fallbackQuery = fallbackQuery.eq("user_id", userId || "no-access-placeholder");
     }
@@ -78,7 +87,7 @@ export async function upsertDeal(deal: Deal): Promise<Deal> {
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
   
   const payload = { ...dealToDb(deal), is_test_data: isTestEnv };
-  const { data, error } = await supabase.from("deals").upsert(payload).select().single();
+  const { data, error } = await (supabase as any).from("deals").upsert(payload).select().single();
 
   if (error) {
     console.error("Error upserting deal:", error);
@@ -94,7 +103,7 @@ export async function deleteDealFromDb(id: string): Promise<void> {
 
 export async function fetchAvailableYears(email: string): Promise<number[]> {
   const isTestEnv = email.endsWith("@teste.com");
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("deals")
     .select("closing_date")
     .eq("is_test_data", isTestEnv);
@@ -132,7 +141,7 @@ export async function fetchPresentations(role: UserRole, userId?: string): Promi
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
-  let query = supabase
+  let query = (supabase as any)
     .from("presentations")
     .select("*")
     .eq("is_test_data", isTestEnv);
@@ -170,7 +179,7 @@ export async function savePresentationToDb(monthKey: string, operation: "bluepex
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
   // First, get existing
-  const { data: existing } = await supabase
+  const { data: existing } = await (supabase as any)
     .from("presentations")
     .select("*")
     .eq("month_key", monthKey)
@@ -181,13 +190,13 @@ export async function savePresentationToDb(monthKey: string, operation: "bluepex
     month_key: monthKey,
     user_id: userId,
     is_test_data: isTestEnv,
-    bluepex_count: existing?.bluepex_count || 0,
-    opus_count: existing?.opus_count || 0,
+    bluepex_count: (existing as any)?.bluepex_count || 0,
+    opus_count: (existing as any)?.opus_count || 0,
   };
 
   if (operation === "bluepex") payload.bluepex_count = count;
   else payload.opus_count = count;
 
-  const { error } = await supabase.from("presentations").upsert(payload);
+  const { error } = await (supabase as any).from("presentations").upsert(payload);
   if (error) throw error;
 }

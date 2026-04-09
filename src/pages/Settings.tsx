@@ -36,12 +36,10 @@ export default function Settings() {
             Meu Perfil
           </TabsTrigger>
           {role === "admin" && (
-              <TabsTrigger value="team" className="text-xs gap-1.5">
-                <>
-                  <Users className="h-3.5 w-3.5" />
-                  <span>Gestão de Equipe</span>
-                </>
-              </TabsTrigger>
+            <TabsTrigger value="team" className="flex items-center gap-2">
+              <Users className="h-3.5 w-3.5" />
+              <span>Gestão de Equipe</span>
+            </TabsTrigger>
           )}
         </TabsList>
 
@@ -258,7 +256,7 @@ function TeamTab() {
       <CardHeader>
         <CardTitle className="text-sm flex items-center gap-2">
           <Users className="h-4 w-4 text-primary" />
-          Gestão de Equipe
+          <span>Gestão de Equipe</span>
         </CardTitle>
       </CardHeader>
       <CardContent>

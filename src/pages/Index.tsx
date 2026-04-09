@@ -33,8 +33,6 @@ export default function Index() {
   
   const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment, refreshDeals } = useAppData(role, sdrIdForData);
 
-  // globalParams eradicated
-
   const currentMonthKey = getMonthKey(new Date());
   const now = new Date();
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -58,7 +56,6 @@ export default function Index() {
   };
 
   const [filtroOperacao, setFiltroOperacao] = useState("Todas");
-  const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
   const [profiles, setProfiles] = useState<any>({});
 
   useEffect(() => {

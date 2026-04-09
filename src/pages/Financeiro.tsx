@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useAppData } from "@/hooks/useAppData";
 import { supabase } from "@/integrations/supabase/client";
+import { KpiCard } from "@/components/KpiCard";
 import { Navigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,14 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowDownToLine, ArrowUpFromLine, Check, Loader2, DollarSign, Wallet } from "lucide-react";
+import { DollarSign, Upload, Download, ArrowRightLeft, Target, TrendingUp, BadgeDollarSign, Calendar, ChevronDown, ChevronUp, Clock, FileText, CheckCircle2, ArrowDownToLine, ArrowUpFromLine, Check, Loader2, Wallet, Plus, CalendarDays, FileDown, Printer, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, getMonthKey, formatMonthLabel, getPaymentDateInfo, getCommissionTier } from "@/lib/commission";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { ChevronDown, ChevronUp, ArrowRightLeft } from "lucide-react";
 import { format } from "date-fns";
+import { Deal } from "@/lib/types";
 
 function FutureProjectionsAccumulatedCard({ projections, role, onSelectMonth }: { projections: any[], role: "user" | "gestor", onSelectMonth: (m: string) => void }) {
   const [expanded, setExpanded] = useState(false);
@@ -151,19 +152,20 @@ export default function Financeiro() {
 }
 
 function UserFinanceiroContent({ userId }: { userId: string }) {
+  const { role, user } = useAuth();
+  const { deals = [], loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal, presentations } = useAppData(role, user?.id);
+  const queryClient = useQueryClient();
   const currentMonthKey = getMonthKey(new Date());
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
-  
-  const { presentations } = useAppData("user", userId);
 
   const { data, isLoading: loading } = useQuery({
     queryKey: ["user-finance-data", userId],
     queryFn: async () => {
       const [dealsRes, salariesRes, profilesRes] = await Promise.all([
-        supabase.from("deals").select("*").eq("user_id", userId).order("closing_date", { ascending: false }),
-        supabase.from("salary_payments").select("*").eq("user_id", userId),
-        supabase.from("profiles").select("user_id, full_name, display_name, commission_percent, fixed_salary").eq("user_id", userId),
+        (supabase.from("deals") as any).select("*").eq("user_id", userId).order("closing_date", { ascending: false }),
+        (supabase.from("salary_payments") as any).select("*").eq("user_id", userId),
+        (supabase.from("profiles") as any).select("user_id, full_name, display_name, commission_percent, fixed_salary").eq("user_id", userId),
       ]);
 
       if (dealsRes.error) throw dealsRes.error;
@@ -173,10 +175,10 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
       const map: ProfileMap = {};
       (profilesRes.data as any[]).forEach((p) => {
         map[p.user_id] = {
-          full_name: p.full_name || p.display_name || "—",
+          full_name: p.full_name || p.display_name || "-",
           display_name: p.display_name || "",
-          commission_percent: p.commission_percent || 20,
-          fixed_salary: p.fixed_salary || 3500,
+          commission_percent: p.commission_percent || 0,
+          fixed_salary: p.fixed_salary || 0,
         };
       });
 
@@ -188,21 +190,24 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
     }
   });
 
-  const deals = data?.deals || [];
-  const salaries = data?.salaries || [];
+  const queryDeals = data?.deals || [];
+  const querySalaries = data?.salaries || [];
   const profiles = data?.profiles || {};
 
+  const activeDeals = (queryDeals.length > 0 ? queryDeals : deals).filter(d => d.user_id === user?.id);
+  const activeSalaries = querySalaries.length > 0 ? querySalaries : [];
+
   const filteredDeals = useMemo(() => {
-    return deals.filter((d) => {
+    return activeDeals.filter((d) => {
       const baseDate = d.first_payment_date || d.implantation_payment_date;
       if (!baseDate) return getMonthKey(d.closing_date) === selectedMonth;
       return getMonthKey(baseDate) === selectedMonth;
     });
-  }, [deals, selectedMonth]);
+  }, [activeDeals, selectedMonth]);
 
   const filteredSalaries = useMemo(() => {
-    return salaries.filter((s) => getMonthKey(s.reference_month) === selectedMonth);
-  }, [salaries, selectedMonth]);
+    return activeSalaries.filter((s) => getMonthKey(s.reference_month) === selectedMonth);
+  }, [activeSalaries, selectedMonth]);
 
   const payableDeals = useMemo(() => {
     return filteredDeals.filter((d) => d.is_mensalidade_paid_by_client || d.is_implantacao_paid_by_client);
@@ -210,7 +215,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
 
   const futureProjections = useMemo(() => {
     const projMap: Record<string, { projectedIn: number }> = {};
-    deals.forEach((deal) => {
+    activeDeals.forEach((deal) => {
       const baseDate = deal.first_payment_date || deal.implantation_payment_date;
       if (!baseDate) return;
       const { monthKey } = getPaymentDateInfo(baseDate);
@@ -228,7 +233,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
     return Object.entries(projMap)
       .map(([key, vals]) => ({ monthKey: key, ...vals }))
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
-  }, [deals, selectedMonth, profiles]);
+  }, [activeDeals, selectedMonth, profiles]);
 
   const kpis = useMemo(() => {
     let projected = 0;
@@ -276,7 +281,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
     queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
-  const getUserName = (id: string) => profiles[id]?.full_name || "—";
+  const getUserName = (id: string) => profiles[id]?.full_name || "-";
 
   return (
     <div className="container py-5">
@@ -294,6 +299,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
             ))}
           </SelectContent>
         </Select>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KpiCard title="Comissão Paga" value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" />
         <KpiCard title="Comissão Projetada" value={formatCurrency(kpis.projected)} icon={TrendingUp} variant="primary" />
@@ -431,13 +437,14 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
 function FinanceiroContent() {
   const queryClient = useQueryClient();
   const { role, user } = useAuth();
+  const { deals = [], loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal, presentations } = useAppData(role, user?.id);
+
   const currentMonthKey = getMonthKey(new Date());
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [filtroOperacao, setFiltroOperacao] = useState("Todas");
   const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
-  const [filtroStatus, setFiltroStatus] = useState("Todos");
-  const sdrIdForData = role === "admin" || role === "gestor" ? (filtroFuncionario === "Todos" ? undefined : filtroFuncionario) : user?.id;
-  const { presentations } = useAppData(role, sdrIdForData);
+  const [filtroStatus, setFiltroStatus] = useState("Todos Status");
+  
   const [filterType, setFilterType] = useState<"month" | "year">("month");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [kpiModalType, setKpiModalType] = useState<"volume" | "pago" | "projetado" | "fixo" | null>(null);
@@ -450,23 +457,23 @@ function FinanceiroContent() {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const isTestEnv = currentUser?.email?.endsWith("@teste.com") || false;
 
-      let dealsQuery = supabase.from("deals").select("*").eq("is_test_data", isTestEnv);
+      let dealsQuery = (supabase.from("deals") as any).select("*").eq("is_test_data", isTestEnv);
       if (role !== "admin") {
         dealsQuery = dealsQuery.eq("user_id", user?.id || "no-access-placeholder");
       }
 
       let dealsRes = await dealsQuery.order("closing_date", { ascending: false });
-      let profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent, fixed_salary").eq("is_test_data", isTestEnv);
-      const salariesRes = await supabase.from("salary_payments").select("*");
+      let profilesRes = await (supabase.from("profiles") as any).select("user_id, full_name, display_name, commission_percent, fixed_salary").eq("is_test_data", isTestEnv);
+      const salariesRes = await (supabase.from("salary_payments") as any).select("*");
 
       if (dealsRes.error && (dealsRes.error.message.includes('is_test_data') || dealsRes.error.message.includes('column'))) {
         console.warn("[Financeiro] Coluna is_test_data ausente. Executando fallback sem filtro.");
-        let fallbackQuery = supabase.from("deals").select("*");
+        let fallbackQuery = (supabase.from("deals") as any).select("*");
         if (role !== "admin") {
           fallbackQuery = fallbackQuery.eq("user_id", user?.id || "no-access-placeholder");
         }
         dealsRes = await fallbackQuery.order("closing_date", { ascending: false });
-        profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent, fixed_salary");
+        profilesRes = await (supabase.from("profiles") as any).select("user_id, full_name, display_name, commission_percent, fixed_salary");
       }
 
       if (dealsRes.error) throw dealsRes.error;
@@ -476,10 +483,10 @@ function FinanceiroContent() {
       const map: ProfileMap = {};
       (profilesRes.data as any[]).forEach((p) => {
         map[p.user_id] = {
-          full_name: p.full_name || p.display_name || "—",
+          full_name: p.full_name || p.display_name || "-",
           display_name: p.display_name || "",
-          commission_percent: p.commission_percent || 20,
-          fixed_salary: p.fixed_salary || 3500,
+          commission_percent: p.commission_percent || 0,
+          fixed_salary: p.fixed_salary || 0,
         };
       });
 
@@ -491,13 +498,16 @@ function FinanceiroContent() {
     }
   });
 
-  const deals = data?.deals || [];
-  const salaries = data?.salaries || [];
+  const queryDeals = data?.deals || [];
+  const querySalaries = data?.salaries || [];
   const profiles = data?.profiles || {};
+
+  const activeDeals = queryDeals.length > 0 ? queryDeals : deals;
+  const activeSalaries = querySalaries.length > 0 ? querySalaries : [];
 
   // Filter deals relevant to selected month and cross-filters
   const filteredDeals = useMemo(() => {
-    return deals.filter((d) => {
+    return activeDeals.filter((d) => {
       // Time filtering based on filterType
       const baseDate = d.first_payment_date || d.implantation_payment_date || d.closing_date;
       const dateObj = new Date(baseDate);
@@ -527,10 +537,10 @@ function FinanceiroContent() {
 
       return passTime && passOp && passUser && passStatus;
     });
-  }, [deals, selectedMonth, filterType, selectedYear, filtroOperacao, filtroFuncionario, filtroStatus]);
+  }, [activeDeals, selectedMonth, filterType, selectedYear, filtroOperacao, filtroFuncionario, filtroStatus]);
 
   const filteredSalaries = useMemo(() => {
-    return salaries.filter((s) => {
+    return activeSalaries.filter((s) => {
       const dateObj = new Date(s.reference_month);
       let passTime = false;
       if (filterType === "month") {
@@ -560,15 +570,15 @@ function FinanceiroContent() {
     const opMeta = 15;
     const opSuperMeta = 30;
 
-    filteredDeals.forEach((deal) => {
+    activeDeals.forEach((deal) => {
       // Logic for commission calculation
-      const baseDate = deal.first_payment_date || deal.implantation_payment_date;
-      if (!baseDate) return; 
-      
+      const baseDate = deal.first_payment_date || deal.implantation_payment_date || deal.closing_date;
       const { monthKey } = getPaymentDateInfo(baseDate);
       
       // If monthly view, must match selectedMonth
       if (filterType === "month" && monthKey !== selectedMonth) return;
+      // If yearly view, must match selectedYear
+      if (filterType === "year" && new Date(baseDate).getFullYear().toString() !== selectedYear) return;
 
       volumeTotal += deal.monthly_value + deal.implantation_value;
 
@@ -598,7 +608,10 @@ function FinanceiroContent() {
 
   const futureProjections = useMemo(() => {
     const projMap: Record<string, { projectedIn: number, projectedOut: number }> = {};
-    deals.forEach((deal) => {
+    activeDeals.forEach((deal) => {
+      // Respect user filter for projections
+      if (filtroFuncionario !== "Todos" && deal.user_id !== filtroFuncionario) return;
+
       const baseDate = deal.first_payment_date || deal.implantation_payment_date;
       if (!baseDate) return;
       const { monthKey } = getPaymentDateInfo(baseDate);
@@ -636,7 +649,7 @@ function FinanceiroContent() {
       .map(([key, vals]) => ({ monthKey: key, ...vals }))
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
       .slice(0, 6); // Limita projeção
-  }, [deals, selectedMonth, filterType, selectedYear, presentations, profiles]);
+  }, [activeDeals, selectedMonth, filterType, selectedYear, presentations, profiles]);
 
   // Deals with confirmed client payment (ready for payout)
   const payableDeals = useMemo(() => {
@@ -678,7 +691,7 @@ function FinanceiroContent() {
   };
 
   const handleConfirmInstallment = async (dealId: string, index: number, checked: boolean) => {
-    const deal = deals.find((d) => d.id === dealId);
+    const deal = activeDeals.find((d) => d.id === dealId);
     if (!deal) return;
     const dates = Array.isArray(deal.installment_dates) ? [...deal.installment_dates] : [];
     if (dates[index]) {
@@ -722,7 +735,7 @@ function FinanceiroContent() {
     queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
-  const getUserName = (userId: string) => profiles[userId]?.full_name || "—";
+  const getUserName = (userId: string) => profiles[userId]?.full_name || "-";
 
   if (loading) {
     return (
@@ -813,7 +826,7 @@ function FinanceiroContent() {
         <Card className="bg-card cursor-pointer hover:border-primary transition-colors hover:shadow-md" onClick={() => setKpiModalType("volume")}>
           <CardHeader className="py-3 px-4 pb-0">
             <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
-              Volume Bruto (Mês)
+              Volume Bruto ({filterType === "month" ? "Mês" : "Ano"})
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 py-3">

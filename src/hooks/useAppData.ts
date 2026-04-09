@@ -87,6 +87,5 @@ export function useAppData(role: UserRole = "user", userId?: string) {
     saveAdjustments(updated);
     setAdjustments(updated);
   }, [adjustments]);
-
   return { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment, refreshDeals: loadDeals };
 }

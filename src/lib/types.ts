@@ -25,11 +25,22 @@ export interface Deal {
   isUserConfirmedPayment?: boolean;
   isMensalidadePaidByClient?: boolean;
   isPaidToUser?: boolean;
+  isTestData?: boolean;
+  isImplantacaoPaid?: boolean;
+  isMensalidadePaid?: boolean;
 }
 
 export interface OperationPresentations {
   bluepex: number;
   opus: number;
+}
+
+export interface MonthlyPresentationRow {
+  month_key: string;
+  user_id: string;
+  bluepex_count: number;
+  opus_count: number;
+  is_test_data: boolean;
 }
 
 export interface MonthlyPresentations {
