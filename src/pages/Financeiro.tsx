@@ -764,8 +764,6 @@ function FinanceiroContent() {
         </Card>
       </div>
 
-      </div>
-
       <FutureProjectionsAccumulatedCard projections={futureProjections} role="gestor" onSelectMonth={setSelectedMonth} />
 
       <Tabs defaultValue="receivables">
