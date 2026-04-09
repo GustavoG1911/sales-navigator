@@ -63,7 +63,7 @@ export async function upsertDeal(deal: Deal): Promise<Deal> {
   return dbToDeal(data);
 }
 
-export async function deleteDeal(id: string): Promise<void> {
+export async function deleteDealFromDb(id: string): Promise<void> {
   const { error } = await supabase
     .from("deals")
     .delete()
