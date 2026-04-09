@@ -29,43 +29,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchRole = async (userId: string) => {
     try {
-      console.log("[useAuth] Buscando role...");
-      const { data, error } = await supabase
+      // Busca direta e rápida
+      const { data } = await supabase
+        .rpc('get_user_role', { user_id_param: userId }); // Tentativa via RPC caso exista
+        
+      if (data) {
+        setRole(data as UserRole);
+        setLoading(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
         .from("profiles")
         .select("role")
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (data && !error) {
-        setRole(data.role as UserRole);
-      } else {
-        setRole("user");
+      if (profile) {
+        setRole(profile.role as UserRole);
       }
     } catch (err) {
-      console.error("[useAuth] Erro na busca de role:", err);
-      setRole("user");
+      console.error("[useAuth] Erro ao buscar role:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Safety Timer: Se em 5 segundos nada carregar, libera o app para evitar tela branca
-    const timer = setTimeout(() => {
-      if (loading) {
-        console.warn("[useAuth] Carregamento forçado por timeout!");
-        setLoading(false);
-      }
-    }, 5000);
+    // Safety Force - Libera em 3 segundos independente de tudo
+    const safety = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("[useAuth] Auth state change:", _event);
       setSession(session);
       if (session?.user) {
         fetchRole(session.user.id);
       } else {
         setLoading(false);
-        setRole("user");
       }
     });
 
@@ -80,16 +81,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       subscription.unsubscribe();
-      clearTimeout(timer);
+      clearTimeout(safety);
     };
   }, []);
 
   const signOut = async () => {
-    setLoading(true);
     await supabase.auth.signOut();
     setSession(null);
     setRole("user");
-    setLoading(false);
   };
 
   return (
