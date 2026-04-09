@@ -137,8 +137,10 @@ export async function fetchPresentations(role: UserRole, userId?: string): Promi
     .select("*")
     .eq("is_test_data", isTestEnv);
 
-  if (role !== "admin") {
-    query = query.eq("user_id", userId || "no-access-placeholder");
+  if (userId) {
+    query = query.eq("user_id", userId);
+  } else if (role !== "admin") {
+    query = query.eq("user_id", user?.id || "no-access-placeholder");
   }
 
   const { data, error } = await query;

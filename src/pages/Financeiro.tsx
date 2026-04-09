@@ -118,7 +118,7 @@ interface SalaryRow {
 }
 
 interface ProfileMap {
-  [userId: string]: { full_name: string; display_name: string; commission_percent: number };
+  [userId: string]: { full_name: string; display_name: string; commission_percent: number; fixed_salary: number };
 }
 
 function buildMonthOptions(): { value: string; label: string }[] {
@@ -163,7 +163,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
       const [dealsRes, salariesRes, profilesRes] = await Promise.all([
         supabase.from("deals").select("*").eq("user_id", userId).order("closing_date", { ascending: false }),
         supabase.from("salary_payments").select("*").eq("user_id", userId),
-        supabase.from("profiles").select("user_id, full_name, display_name, commission_percent").eq("user_id", userId),
+        supabase.from("profiles").select("user_id, full_name, display_name, commission_percent, fixed_salary").eq("user_id", userId),
       ]);
 
       if (dealsRes.error) throw dealsRes.error;
@@ -176,6 +176,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
           full_name: p.full_name || p.display_name || "—",
           display_name: p.display_name || "",
           commission_percent: p.commission_percent || 20,
+          fixed_salary: p.fixed_salary || 3500,
         };
       });
 
@@ -193,12 +194,9 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
 
   const filteredDeals = useMemo(() => {
     return deals.filter((d) => {
-      // Regra de Corte (<= 7)
       const baseDate = d.first_payment_date || d.implantation_payment_date;
-      if (!baseDate) return getMonthKey(d.closing_date) === selectedMonth; // Tratativa silenciosa p/ base antiga
-
-      const { monthKey } = getPaymentDateInfo(baseDate);
-      return monthKey === selectedMonth;
+      if (!baseDate) return getMonthKey(d.closing_date) === selectedMonth;
+      return getMonthKey(baseDate) === selectedMonth;
     });
   }, [deals, selectedMonth]);
 
@@ -220,7 +218,6 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
         if (!projMap[monthKey]) projMap[monthKey] = { projectedIn: 0 };
         
         const commissionRate = deal.commission_rate_snapshot ?? ((profiles[deal.user_id]?.commission_percent || 20) / 100);
-        // Na visão do SDR, "Entradas" significam suas próprias comissões
         const baseMonthlyComm = deal.commission_amount_snapshot ? (deal.commission_amount_snapshot * (deal.monthly_value/(deal.monthly_value + (deal.implantation_value*0.4)))) : (deal.monthly_value * commissionRate);
         const baseImplComm = deal.commission_amount_snapshot ? (deal.commission_amount_snapshot * ((deal.implantation_value*0.4)/(deal.monthly_value + (deal.implantation_value*0.4)))) : ((deal.implantation_value * 0.4) * commissionRate);
         
@@ -232,6 +229,34 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
       .map(([key, vals]) => ({ monthKey: key, ...vals }))
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
   }, [deals, selectedMonth, profiles]);
+
+  const kpis = useMemo(() => {
+    let projected = 0;
+    let paid = 0;
+    let volume = 0;
+    filteredDeals.forEach((deal) => {
+      volume += (deal.monthly_value + deal.implantation_value);
+      
+      const presMonth = presentations[selectedMonth] || { bluepex: 0, opus: 0 };
+      const presCount = deal.operation === "BluePex" ? presMonth.bluepex : presMonth.opus;
+      const meta = 15;
+      const smeta = 30;
+      const tier = getCommissionTier(presCount, meta, smeta);
+      const commissionRate = deal.commission_rate_snapshot ?? ((profiles[deal.user_id]?.commission_percent || 20) / 100);
+
+      const baseMonthlyComm = (deal.monthly_value * Math.min(tier.rate, 1.0)) * commissionRate;
+      const baseImplComm = (deal.implantation_value * 0.4) * commissionRate;
+      const superMetaBonus = tier.rate >= 2.0 ? baseMonthlyComm : 0;
+      const totalDealComm = baseMonthlyComm + baseImplComm + superMetaBonus;
+
+      if (deal.is_paid_to_user) paid += totalDealComm;
+      else projected += totalDealComm;
+    });
+
+    const totalFixo = filteredSalaries.length > 0 ? filteredSalaries.reduce((acc, s) => acc + s.amount, 0) : (profiles[userId]?.fixed_salary || 0);
+
+    return { projected, paid, volume, fixed: totalFixo };
+  }, [filteredDeals, filteredSalaries, profiles, userId, selectedMonth, presentations]);
 
   if (loading) {
     return (
@@ -269,6 +294,11 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
             ))}
           </SelectContent>
         </Select>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <KpiCard title="Comissão Paga" value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" />
+        <KpiCard title="Comissão Projetada" value={formatCurrency(kpis.projected)} icon={TrendingUp} variant="primary" />
+        <KpiCard title="Volume de Vendas" value={formatCurrency(kpis.volume)} icon={BarChart3} variant="warning" />
+        <KpiCard title="Salário Fixo" value={formatCurrency(kpis.fixed)} icon={DollarSign} variant="primary" />
       </div>
 
       <FutureProjectionsAccumulatedCard projections={futureProjections} role="user" onSelectMonth={setSelectedMonth} />
@@ -360,9 +390,14 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
               <TableBody>
                 {filteredSalaries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">
-                      Nenhum salário registrado para este mês.
-                    </TableCell>
+                     <TableCell>
+                        <Badge variant="secondary" className="text-[9px] uppercase">BDtech</Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-mono">{formatCurrency(profiles[userId]?.fixed_salary || 0)}</TableCell>
+                      <TableCell className="text-sm">Recorrente (20/{selectedMonth.split("-")[1]})</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-500/30 bg-yellow-500/10">A Receber</Badge>
+                      </TableCell>
                   </TableRow>
                 ) : (
                   filteredSalaries.map((s) => (
@@ -423,7 +458,7 @@ function FinanceiroContent() {
       }
 
       let dealsRes = await dealsQuery.order("closing_date", { ascending: false });
-      let profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent").eq("is_test_data", isTestEnv);
+      let profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent, fixed_salary").eq("is_test_data", isTestEnv);
       const salariesRes = await supabase.from("salary_payments").select("*");
 
       if (dealsRes.error && (dealsRes.error.message.includes('is_test_data') || dealsRes.error.message.includes('column'))) {
@@ -433,7 +468,7 @@ function FinanceiroContent() {
           fallbackQuery = fallbackQuery.eq("user_id", user?.id || "no-access-placeholder");
         }
         dealsRes = await fallbackQuery.order("closing_date", { ascending: false });
-        profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent");
+        profilesRes = await supabase.from("profiles").select("user_id, full_name, display_name, commission_percent, fixed_salary");
       }
 
       if (dealsRes.error) throw dealsRes.error;
@@ -446,6 +481,7 @@ function FinanceiroContent() {
           full_name: p.full_name || p.display_name || "—",
           display_name: p.display_name || "",
           commission_percent: p.commission_percent || 20,
+          fixed_salary: p.fixed_salary || 3500,
         };
       });
 
