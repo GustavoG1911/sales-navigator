@@ -344,15 +344,35 @@ function TeamTab() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase
-      .from("profiles")
-      .select("id, user_id, display_name, full_name, role, job_title, position, created_at")
-      .order("created_at", { ascending: true })
-      .then(({ data, error }) => {
-        if (data) setProfiles(data);
-        if (error) toast.error("Erro ao carregar usuários: " + error.message);
-        setLoading(false);
-      });
+    const loadTeam = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const isTestEnv = user?.email?.endsWith("@teste.com") || false;
+
+      let query = supabase
+        .from("profiles")
+        .select("id, user_id, display_name, full_name, role, job_title, position, created_at")
+        .eq("is_test_data", isTestEnv)
+        .order("created_at", { ascending: true });
+
+      let { data, error } = await query;
+
+      // Fallback para caso a coluna ainda não exista no Supabase
+      if (error && (error.message?.includes("is_test_data") || error.message?.includes("column"))) {
+        console.warn("[Settings] Coluna is_test_data não encontrada, buscando tudo.");
+        const fallback = await supabase
+          .from("profiles")
+          .select("id, user_id, display_name, full_name, role, job_title, position, created_at")
+          .order("created_at", { ascending: true });
+        data = fallback.data;
+        error = fallback.error;
+      }
+
+      if (data) setProfiles(data);
+      if (error) toast.error("Erro ao carregar usuários: " + error.message);
+      setLoading(false);
+    };
+
+    loadTeam();
   }, []);
 
   const handleUpdateField = async (userId: string, field: "role" | "position", newRole: string) => {
