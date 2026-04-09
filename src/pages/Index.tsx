@@ -90,12 +90,11 @@ export default function Index() {
     [deals, dateRange, filtroOperacao, filtroFuncionario, role, user]
   );
 
-  // Deals filtered by BASE DATE (for Financial KPIs - matching Financeiro.tsx logic)
   const financialDeals = useMemo(
     () => deals.filter((d) => {
       const baseDate = d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
-      const date = new Date(baseDate);
-      const passDate = date >= dateRange.from && date <= dateRange.to;
+      const { monthKey } = getPaymentDateInfo(baseDate);
+      const passDate = monthKey === selectedMonthKey; // Aplica a regra financeira real
 
       if (role === "admin" || role === "gestor") {
         const passOp = filtroOperacao === "Todas" || d.operation === filtroOperacao;
@@ -104,7 +103,7 @@ export default function Index() {
       }
       return passDate && (!user || d.userId === user.id || !d.userId); 
     }),
-    [deals, dateRange, filtroOperacao, filtroFuncionario, role, user]
+    [deals, selectedMonthKey, filtroOperacao, filtroFuncionario, role, user]
   );
 
   const filteredDeals = closedDeals; // Fallback for table and other uses
@@ -334,6 +333,19 @@ export default function Index() {
               <h2 className="text-sm font-semibold text-foreground">{periodLabel}</h2>
               <span className="text-xs text-muted-foreground">{filteredDeals.length} fechamento(s)</span>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 my-6">
+             <div className="lg:col-span-2">
+                 <PresentationsCard
+                   presentations={currentMonthPres}
+                   onUpdate={(op, count) => updatePresentations(selectedMonthKey, op, count)}
+                   settings={settings}
+                 />
+             </div>
+             <div>
+                 <SettingsPanel settings={settings} onUpdate={updateSettings} />
+             </div>
           </div>
 
           <div>
