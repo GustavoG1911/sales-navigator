@@ -37,8 +37,10 @@ export default function Settings() {
           </TabsTrigger>
           {role === "admin" && (
               <TabsTrigger value="team" className="text-xs gap-1.5">
-                <Users className="h-3.5 w-3.5" />
-                Gestão de Equipe
+                <>
+                  <Users className="h-3.5 w-3.5" />
+                  <span>Gestão de Equipe</span>
+                </>
               </TabsTrigger>
           )}
         </TabsList>
