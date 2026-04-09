@@ -555,7 +555,7 @@ function FinanceiroContent() {
       if (filtroStatus === "Pendentes") passStatus = !s.is_paid_by_gestor;
       return passTime && passUser && passStatus;
     });
-  }, [salaries, selectedMonth, filterType, selectedYear, filtroFuncionario, filtroStatus]);
+  }, [activeSalaries, selectedMonth, filterType, selectedYear, filtroFuncionario, filtroStatus]);
 
   // KPI Calculations based on filtered lists
   const kpis = useMemo(() => {
