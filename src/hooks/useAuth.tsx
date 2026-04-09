@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchRole = async (userId: string) => {
     try {
+      console.log("[useAuth] Buscando perfil para:", userId);
       const { data, error } = await supabase
         .from("profiles")
         .select("role")
@@ -36,48 +37,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (error) {
-        console.error("[useAuth] Erro ao buscar perfil:", error.message, error.details, error.hint);
+        console.error("[useAuth] Erro ao buscar perfil:", error.message);
         setRole("user");
-        return;
-      }
-
-      if (!data) {
-        console.warn("[useAuth] Nenhum perfil encontrado para user_id:", userId);
-        setRole("user");
-        return;
-      }
-
-      const dbRole = data.role as string;
-      if (dbRole === "admin") {
-        setRole("admin");
-      } else if (dbRole === "gestor") {
-        setRole("gestor");
+      } else if (data) {
+        const dbRole = data.role as any;
+        if (dbRole === "admin") setRole("admin");
+        else if (dbRole === "gestor") setRole("gestor");
+        else setRole("user");
       } else {
         setRole("user");
       }
     } catch (err) {
-      console.error("[useAuth] Exceção inesperada ao buscar role:", err);
+      console.error("[useAuth] Crash fatal no fetchRole capturado:", err);
       setRole("user");
+    } finally {
+      // Garante que o estado de loading saia de true independente de erro
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("[useAuth] Auth state changed:", _event, session?.user?.email);
       setSession(session);
       if (session?.user) {
         fetchRole(session.user.id);
       } else {
         setRole("user");
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
         fetchRole(session.user.id);
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();

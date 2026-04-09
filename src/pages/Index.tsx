@@ -78,21 +78,15 @@ export default function Index() {
 
   useEffect(() => {
     if (role === "admin" || role === "gestor") {
-      const isTestEnv = user?.email?.endsWith("@teste.com") || false;
-      const loadProfiles = async () => {
-        let res = await supabase.from("profiles").select("user_id, full_name").eq("is_test_data", isTestEnv);
-        if (res.error && res.error.message?.includes("is_test_data")) {
-          res = await supabase.from("profiles").select("user_id, full_name");
-        }
-        if (res.data) {
+      supabase.from("profiles").select("user_id, full_name").then(({ data }) => {
+        if (data) {
           const map: any = {};
-          res.data.forEach(p => map[p.user_id] = p.full_name);
+          data.forEach(p => map[p.user_id] = p.full_name);
           setProfiles(map);
         }
-      };
-      loadProfiles();
+      });
     }
-  }, [role, user]);
+  }, [role]);
 
   const filteredDeals = useMemo(
     () => deals.filter((d) => {
