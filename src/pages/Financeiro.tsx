@@ -131,7 +131,9 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
   const filteredDeals = useMemo(() => {
     return deals.filter((d) => {
       // Regra de Corte (<= 7)
-      const baseDate = d.first_payment_date || d.implantation_payment_date || d.closing_date;
+      const baseDate = d.first_payment_date || d.implantation_payment_date;
+      if (!baseDate) return getMonthKey(d.closing_date) === selectedMonth; // Tratativa silenciosa p/ base antiga
+
       const { monthKey } = getPaymentDateInfo(baseDate);
       return monthKey === selectedMonth;
     });
@@ -341,8 +343,13 @@ function FinanceiroContent() {
   const filteredDeals = useMemo(() => {
     return deals.filter((d) => {
       // Month - using getPaymentDateInfo (Rule of 7)
-      const baseDate = d.first_payment_date || d.implantation_payment_date || d.closing_date;
-      const { monthKey } = getPaymentDateInfo(baseDate);
+      const baseDate = d.first_payment_date || d.implantation_payment_date;
+      let monthKey = "";
+      if (baseDate) {
+        monthKey = getPaymentDateInfo(baseDate).monthKey;
+      } else {
+        monthKey = getMonthKey(d.closing_date); // Tratativa p/ exibir em algum mês sem calcular comissão errada
+      }
       const passMonth = monthKey === selectedMonth;
 
       // Operation
@@ -378,7 +385,9 @@ function FinanceiroContent() {
 
     filteredDeals.forEach((deal) => {
       // Only count if it's due this month according to the cut-off rule
-      const baseDate = deal.first_payment_date || deal.implantation_payment_date || deal.closing_date;
+      const baseDate = deal.first_payment_date || deal.implantation_payment_date;
+      if (!baseDate) return; // Se não tem data base do cliente, não calcula comissão para não poluir fluxo
+      
       const { monthKey } = getPaymentDateInfo(baseDate);
       if (monthKey !== selectedMonth) return;
 
@@ -746,8 +755,15 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
   const [expanded, setExpanded] = useState(false);
   const [payDate, setPayDate] = useState(deal.user_payment_date ? deal.user_payment_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
 
-  const baseDate = deal.first_payment_date || deal.implantation_payment_date || deal.closing_date;
-  const { monthKey, expectedPaymentDate } = getPaymentDateInfo(baseDate);
+  const baseDate = deal.first_payment_date || deal.implantation_payment_date;
+  let monthKey = getMonthKey(deal.closing_date);
+  let expectedPaymentDateStr = "Data Pendente";
+
+  if (baseDate) {
+    const info = getPaymentDateInfo(baseDate);
+    monthKey = info.monthKey;
+    expectedPaymentDateStr = new Date(info.expectedPaymentDate + "T12:00:00").toLocaleDateString("pt-BR");
+  }
 
   const bpMeta = globalParams?.meta_apresentacoes_bluepex || 15;
   const bpSuperMeta = globalParams?.super_meta_bluepex || 30;
@@ -765,7 +781,8 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
   const baseMonthlyComm = Math.round((deal.monthly_value * Math.min(tier.rate, 1.0)) * commissionRate * 100) / 100;
   const baseImplComm = Math.round((deal.implantation_value * 0.4) * commissionRate * 100) / 100;
   const superMetaBonus = tier.rate >= 2.0 ? baseMonthlyComm : 0;
-  const dealComiss = baseMonthlyComm + baseImplComm + superMetaBonus;
+  // Fallback: se for dado legado sem data, ele mapeia a linha mas zera comissão pra evitar erro.
+  const dealComiss = baseDate ? baseMonthlyComm + baseImplComm + superMetaBonus : 0;
 
   return (
     <>
@@ -826,7 +843,7 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground">Pagamento Previsto</p>
-                <p className="font-medium text-blue-600/80">{new Date(expectedPaymentDate + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+                <p className="font-medium text-blue-600/80">{expectedPaymentDateStr}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-muted-foreground">Data Realizada</p>

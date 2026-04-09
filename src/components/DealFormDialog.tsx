@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface DealFormDialogProps {
   open: boolean;
@@ -56,8 +57,12 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
       setClientName("");
       setMonthlyValue("");
       setImplantationValue("");
-      setFirstPaymentDate(undefined);
-      setImplantationPaymentDate(undefined);
+      
+      const defaultPayDate = new Date();
+      defaultPayDate.setDate(defaultPayDate.getDate() + 30);
+      setFirstPaymentDate(defaultPayDate);
+      setImplantationPaymentDate(defaultPayDate);
+      
       setIsInstallment(false);
       setInstallmentCount("2");
       setInstallmentDates([]);
@@ -74,8 +79,25 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
     });
   }, [installmentCount]);
 
+  useEffect(() => {
+    if (!editDeal && closingDate && !firstPaymentDate) {
+      const d = new Date(closingDate);
+      d.setDate(d.getDate() + 30);
+      setFirstPaymentDate(d);
+      setImplantationPaymentDate(d);
+    }
+  }, [closingDate, editDeal, firstPaymentDate]);
+
   const handleSave = () => {
-    if (!closingDate || !clientName.trim()) return;
+    if (!closingDate || !clientName.trim()) {
+      toast.error("Preencha a data de fechamento e o nome da empresa.");
+      return;
+    }
+    if (!firstPaymentDate || !implantationPaymentDate) {
+      toast.error("O preenchimento da Data do Primeiro Pagamento e Data de Implantação é OBRIGATÓRIO.");
+      return;
+    }
+
     const deal: Deal = {
       id: editDeal?.id || genId(),
       closingDate: closingDate.toISOString(),
@@ -83,8 +105,8 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
       clientName: clientName.trim(),
       monthlyValue: parseFloat(monthlyValue) || 0,
       implantationValue: parseFloat(implantationValue) || 0,
-      firstPaymentDate: firstPaymentDate?.toISOString() || closingDate.toISOString(),
-      implantationPaymentDate: implantationPaymentDate?.toISOString() || closingDate.toISOString(),
+      firstPaymentDate: firstPaymentDate.toISOString(),
+      implantationPaymentDate: implantationPaymentDate.toISOString(),
       isInstallment,
       installmentCount: isInstallment ? parseInt(installmentCount) || 2 : 0,
       installmentDates: isInstallment
