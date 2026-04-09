@@ -28,7 +28,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 export default function Index() {
   const queryClient = useQueryClient();
   const { signOut, role, user } = useAuth();
-  const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment, refreshDeals } = useAppData(role, user?.id);
+  const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
+  const sdrIdForData = role === "admin" || role === "gestor" ? (filtroFuncionario === "Todos" ? undefined : filtroFuncionario) : user?.id;
+  
+  const { deals, loading, addOrUpdateDeal, removeDeal, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, adjustments, updateAdjustment, refreshDeals } = useAppData(role, sdrIdForData);
 
   // globalParams eradicated
 
@@ -74,7 +77,8 @@ export default function Index() {
     fetchAvailableYears(user?.email || "").then(setAvailableYears);
   }, [user?.email]);
 
-  const filteredDeals = useMemo(
+  // Deals filtered by CLOSING DATE (for Counts and Volume)
+  const closedDeals = useMemo(
     () => deals.filter((d) => {
       const date = new Date(d.closingDate);
       const passDate = date >= dateRange.from && date <= dateRange.to;
@@ -84,66 +88,115 @@ export default function Index() {
         const passUser = filtroFuncionario === "Todos" || d.userId === filtroFuncionario;
         return passDate && passOp && passUser;
       }
-
-      // User restricted view logic
       return passDate && (!user || d.userId === user.id || !d.userId); 
     }),
-    [deals, dateRange, filtroOperacao, filtroFuncionario, role, user, periodType]
+    [deals, dateRange, filtroOperacao, filtroFuncionario, role, user]
   );
+
+  // Deals filtered by BASE DATE (for Financial KPIs - matching Financeiro.tsx logic)
+  const financialDeals = useMemo(
+    () => deals.filter((d) => {
+      const baseDate = d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
+      const date = new Date(baseDate);
+      const passDate = date >= dateRange.from && date <= dateRange.to;
+
+      if (role === "admin" || role === "gestor") {
+        const passOp = filtroOperacao === "Todas" || d.operation === filtroOperacao;
+        const passUser = filtroFuncionario === "Todos" || d.userId === filtroFuncionario;
+        return passDate && passOp && passUser;
+      }
+      return passDate && (!user || d.userId === user.id || !d.userId); 
+    }),
+    [deals, dateRange, filtroOperacao, filtroFuncionario, role, user]
+  );
+
+  const filteredDeals = closedDeals; // Fallback for table and other uses
 
   const isSingleMonth = dateRange.from.getMonth() === dateRange.to.getMonth() && dateRange.from.getFullYear() === dateRange.to.getFullYear();
   const selectedMonthKey = isSingleMonth ? getMonthKey(dateRange.from) : currentMonthKey;
 
   const currentMonthPres = presentations[selectedMonthKey] || { bluepex: 0, opus: 0 };
 
-  // Chart Data Calculations
+  // Timeline Data for Charts
+  const chartTimeline = useMemo(() => {
+    const data: any[] = [];
+    let start = new Date(dateRange.from);
+    const end = new Date(dateRange.to);
+    
+    // Safety to prevent infinite loop
+    let iterations = 0;
+    while (start <= end && iterations < 24) {
+      iterations++;
+      const mKey = getMonthKey(start);
+      const mLabel = formatMonthLabel(mKey);
+      
+      const dealsInMonth = closedDeals.filter(d => getMonthKey(new Date(d.closingDate)) === mKey);
+      const bpVol = dealsInMonth.filter(d => d.operation === "BluePex").reduce((acc, d) => acc + d.monthlyValue + d.implantationValue, 0);
+      const opVol = dealsInMonth.filter(d => d.operation === "Opus Tech").reduce((acc, d) => acc + d.monthlyValue + d.implantationValue, 0);
+      
+      const p = presentations[mKey] || { bluepex: 0, opus: 0 };
+      
+      data.push({
+        name: mLabel,
+        monthKey: mKey,
+        bluepexVolume: bpVol,
+        opusVolume: opVol,
+        bluepexPres: p.bluepex,
+        opusPres: p.opus,
+        totalVolume: bpVol + opVol,
+        totalPres: p.bluepex + p.opus
+      });
+      
+      start.setMonth(start.getMonth() + 1);
+    }
+    return data;
+  }, [dateRange, closedDeals, presentations]);
+
   const volumeChartData = useMemo(() => {
-    let bpVolume = 0;
-    let opVolume = 0;
-    filteredDeals.forEach(d => {
-      const val = d.monthlyValue + d.implantationValue;
-      if (d.operation === "BluePex") bpVolume += val;
-      if (d.operation === "Opus Tech") opVolume += val;
-    });
-    return [
-      { name: "BluePex", volume: bpVolume, fill: "#3b82f6" },
-      { name: "Opus Tech", volume: opVolume, fill: "#10b981" }
-    ];
-  }, [filteredDeals]);
+    if (isSingleMonth && chartTimeline.length > 0) {
+      const d = chartTimeline[0];
+      return [
+        { name: "BluePex", value: d.bluepexVolume, fill: "#3b82f6" },
+        { name: "Opus Tech", value: d.opusVolume, fill: "#10b981" }
+      ];
+    }
+    return chartTimeline.map(d => ({
+      name: d.name,
+      "BluePex": d.bluepexVolume,
+      "Opus Tech": d.opusVolume
+    }));
+  }, [isSingleMonth, chartTimeline]);
 
   const presChartData = useMemo(() => {
-    let bpPres = 0;
-    let opPres = 0;
-    
-    if (isSingleMonth) {
-      bpPres = currentMonthPres.bluepex;
-      opPres = currentMonthPres.opus;
-    } else {
-      let start = new Date(dateRange.from);
-      const end = new Date(dateRange.to);
-      while (start <= end) {
-        const key = getMonthKey(start);
-        const p = presentations[key];
-        if (p) { bpPres += p.bluepex; opPres += p.opus; }
-        start.setMonth(start.getMonth() + 1);
-      }
+    if (isSingleMonth && chartTimeline.length > 0) {
+      const d = chartTimeline[0];
+      return [
+        { name: "BluePex", value: d.bluepexPres, fill: "#3b82f6" },
+        { name: "Opus Tech", value: d.opusPres, fill: "#10b981" }
+      ];
     }
-    
-    return [
-      { name: "BluePex", apresentacoes: bpPres, fill: "#3b82f6" },
-      { name: "Opus Tech", apresentacoes: opPres, fill: "#10b981" }
-    ];
-  }, [isSingleMonth, currentMonthPres, presentations, dateRange]);
+    return chartTimeline.map(d => ({
+      name: d.name,
+      "BluePex": d.bluepexPres,
+      "Opus Tech": d.opusPres
+    }));
+  }, [isSingleMonth, chartTimeline]);
 
   const kpis = useMemo(() => {
     let projected = 0;
     let paid = 0;
-    filteredDeals.forEach((deal) => {
+    financialDeals.forEach((deal) => {
       const presCount = getPresentationsForDeal(deal, presentations);
       const comm = calculateCommission(deal, presCount, settings, false);
       projected += comm.totalCommission;
       if (deal.paymentStatus === "Pago") paid += comm.totalCommission;
     });
+
+    let totalVolume = 0;
+    closedDeals.forEach((d) => {
+      totalVolume += (d.monthlyValue + d.implantationValue);
+    });
+
     let totalPres = 0;
     if (isSingleMonth) {
       totalPres = currentMonthPres.bluepex + currentMonthPres.opus;
@@ -157,8 +210,8 @@ export default function Index() {
         start.setMonth(start.getMonth() + 1);
       }
     }
-    return { salary: settings.fixedSalary, projected, paid, total: settings.fixedSalary + paid, presentations: totalPres };
-  }, [filteredDeals, presentations, settings, currentMonthPres, isSingleMonth, dateRange]);
+    return { salary: settings.fixedSalary, projected, paid, totalVolume, presentations: totalPres };
+  }, [financialDeals, closedDeals, presentations, settings, currentMonthPres, isSingleMonth, dateRange]);
 
   const handleStatusChange = async (deal: Deal, status: PaymentStatus) => {
     await addOrUpdateDeal({ ...deal, paymentStatus: status });
@@ -177,7 +230,8 @@ export default function Index() {
   const kpiModalTitles = {
     projected: "Comissão Projetada (Pendente)",
     paid: "Comissão Destravada (Paga)",
-    deals: `Fechamentos ${periodSuffix}`
+    deals: `Fechamentos ${periodSuffix}`,
+    volume: `Volume Total ${periodSuffix}`
   };
 
   const handleEdit = (deal: Deal) => {
@@ -314,11 +368,12 @@ export default function Index() {
                 tooltip="Soma das comissões e implantações que já constam como recebidas/pagas."
               />
               <KpiCard 
-                title={`Total ${periodSuffix}`} 
-                value={formatCurrency(kpis.total)} 
+                title={`VOLUME ${periodSuffix.toUpperCase()}`} 
+                value={formatCurrency(kpis.totalVolume)} 
                 icon={DollarSign} 
                 variant="warning" 
-                tooltip="Montante bruto geral (Pago + Projetado) gerado no período."
+                onClick={() => setKpiModalType("deals")}
+                tooltip="Valor total bruto (Mensalidade + Implantação) dos negócios fechados no período."
               />
             </div>
           </div>
@@ -373,18 +428,25 @@ export default function Index() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={volumeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#888' }} />
-                      <YAxis tickFormatter={(val) => `R$${(val/1000)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#888' }} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#888' }} />
+                      <YAxis tickFormatter={(val) => `R$${(val/1000)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#888' }} />
                       <RechartsTooltip 
                         formatter={(value: number) => formatCurrency(value)}
-                        contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                        contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
                         cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                       />
-                      <Bar dataKey="volume" radius={[4, 4, 0, 0]}>
-                        {volumeChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Bar>
+                      {isSingleMonth ? (
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          {volumeChartData.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      ) : (
+                        <>
+                          <Bar dataKey="BluePex" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="Opus Tech" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        </>
+                      )}
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -401,18 +463,25 @@ export default function Index() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={presChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#888' }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#888' }} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#888' }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#888' }} />
                       <RechartsTooltip 
                         formatter={(value: number) => [`${value} APs`, "Apresentações"]}
-                        contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                        contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
                         cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                       />
-                      <Bar dataKey="apresentacoes" radius={[4, 4, 0, 0]}>
-                        {presChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Bar>
+                      {isSingleMonth ? (
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          {presChartData.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      ) : (
+                        <>
+                          <Bar dataKey="BluePex" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="Opus Tech" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        </>
+                      )}
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

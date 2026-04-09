@@ -399,6 +399,8 @@ function FinanceiroContent() {
   const [filtroOperacao, setFiltroOperacao] = useState("Todas");
   const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
+  const sdrIdForData = role === "admin" || role === "gestor" ? (filtroFuncionario === "Todos" ? undefined : filtroFuncionario) : user?.id;
+  const { presentations } = useAppData(role, sdrIdForData);
   const [filterType, setFilterType] = useState<"month" | "year">("month");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [kpiModalType, setKpiModalType] = useState<"volume" | "pago" | "projetado" | "fixo" | null>(null);

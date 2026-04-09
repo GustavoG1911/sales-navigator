@@ -1,33 +1,40 @@
 import { useState, useCallback, useEffect } from "react";
 import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings, ReceivableAdjustments, ReceivableAdjustment } from "@/lib/types";
 import { getPresentations, savePresentations, getSettings, saveSettings, getSuperMeta, saveSuperMeta, getAdjustments, saveAdjustments } from "@/lib/store";
-import { fetchDeals, upsertDeal, deleteDealFromDb } from "@/lib/supabase-deals";
+import { fetchDeals, upsertDeal, deleteDealFromDb, fetchPresentations, savePresentationToDb } from "@/lib/supabase-deals";
 import { toast } from "sonner";
 import { UserRole } from "./useAuth";
 
 export function useAppData(role: UserRole = "user", userId?: string) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [presentations, setPresentations] = useState<MonthlyPresentations>(getPresentations);
+  const [presentations, setPresentations] = useState<MonthlyPresentations>({});
   const [settings, setSettings] = useState<AppSettings>(getSettings);
   const [superMeta, setSuperMeta] = useState<MonthlySuperMeta>(getSuperMeta);
   const [adjustments, setAdjustments] = useState<ReceivableAdjustments>(getAdjustments);
 
-  const loadDeals = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
-      const data = await fetchDeals(role, userId);
-      setDeals(data);
+      setLoading(true);
+      const [dealsData, presData] = await Promise.all([
+        fetchDeals(role, userId),
+        fetchPresentations(role, userId)
+      ]);
+      setDeals(dealsData);
+      setPresentations(presData);
     } catch (err: any) {
-      console.error("Error fetching deals:", err);
-      toast.error("Erro ao carregar fechamentos");
+      console.error("Error fetching data:", err);
+      toast.error("Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
   }, [role, userId]);
 
+  const loadDeals = loadData; // Alias for compatibility
+
   useEffect(() => {
-    loadDeals();
-  }, [loadDeals]);
+    loadData();
+  }, [loadData]);
 
   const addOrUpdateDeal = useCallback(async (deal: Deal) => {
     try {
@@ -49,12 +56,20 @@ export function useAppData(role: UserRole = "user", userId?: string) {
     }
   }, [loadDeals]);
 
-  const updatePresentations = useCallback((monthKey: string, operation: "bluepex" | "opus", count: number) => {
-    const current = presentations[monthKey] || { bluepex: 0, opus: 0 };
-    const updated = { ...presentations, [monthKey]: { ...current, [operation]: count } };
-    savePresentations(updated);
-    setPresentations(updated);
-  }, [presentations]);
+  const updatePresentations = useCallback(async (monthKey: string, operation: "bluepex" | "opus", count: number) => {
+    if (!userId) {
+      toast.error("Usuário não identificado");
+      return;
+    }
+    try {
+      await savePresentationToDb(monthKey, operation, count, userId);
+      const updatedData = await fetchPresentations(role, userId);
+      setPresentations(updatedData);
+    } catch (err: any) {
+      console.error("Error saving presentations:", err);
+      toast.error("Erro ao salvar apresentações");
+    }
+  }, [role, userId]);
 
   const updateSettings = useCallback((newSettings: AppSettings) => {
     saveSettings(newSettings);

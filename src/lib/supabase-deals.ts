@@ -118,3 +118,74 @@ export async function fetchAvailableYears(email: string): Promise<number[]> {
 
   return Array.from(years).sort((a, b) => b - a);
 }
+
+export interface DbPresentation {
+  id?: string;
+  user_id: string;
+  month_key: string;
+  bluepex_count: number;
+  opus_count: number;
+  is_test_data: boolean;
+}
+
+export async function fetchPresentations(role: UserRole, userId?: string): Promise<MonthlyPresentations> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const isTestEnv = user?.email?.endsWith("@teste.com") || false;
+
+  let query = supabase
+    .from("presentations")
+    .select("*")
+    .eq("is_test_data", isTestEnv);
+
+  if (role !== "admin") {
+    query = query.eq("user_id", userId || "no-access-placeholder");
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[fetchPresentations] Erro:", error);
+    return {};
+  }
+
+  const result: MonthlyPresentations = {};
+  data?.forEach((p: any) => {
+    // If Admin, we might have multiple users for the same month.
+    // We should aggregate them if we want a global view, but useAppData handles the full list.
+    // For simplicity, we'll store them by month but we need to decide if we aggregate here or later.
+    // If the user selects a specific SDR, we only get their rows.
+    const key = p.month_key;
+    if (!result[key]) result[key] = { bluepex: 0, opus: 0 };
+    result[key].bluepex += p.bluepex_count;
+    result[key].opus += p.opus_count;
+  });
+
+  return result;
+}
+
+export async function savePresentationToDb(monthKey: string, operation: "bluepex" | "opus", count: number, userId: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const isTestEnv = user?.email?.endsWith("@teste.com") || false;
+
+  // First, get existing
+  const { data: existing } = await supabase
+    .from("presentations")
+    .select("*")
+    .eq("month_key", monthKey)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const payload: any = {
+    month_key: monthKey,
+    user_id: userId,
+    is_test_data: isTestEnv,
+    bluepex_count: existing?.bluepex_count || 0,
+    opus_count: existing?.opus_count || 0,
+  };
+
+  if (operation === "bluepex") payload.bluepex_count = count;
+  else payload.opus_count = count;
+
+  const { error } = await supabase.from("presentations").upsert(payload);
+  if (error) throw error;
+}
