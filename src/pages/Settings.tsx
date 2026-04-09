@@ -36,10 +36,10 @@ export default function Settings() {
             Meu Perfil
           </TabsTrigger>
           {role === "admin" && (
+              <TabsTrigger value="team" className="text-xs gap-1.5">
                 <Users className="h-3.5 w-3.5" />
                 Gestão de Equipe
               </TabsTrigger>
-            </>
           )}
         </TabsList>
 
@@ -48,8 +48,7 @@ export default function Settings() {
         </TabsContent>
         {role === "admin" && (
           <TabsContent value="team">
-              <TeamTab />
-            </TabsContent>
+            <TeamTab />
           </TabsContent>
         )}
       </Tabs>
