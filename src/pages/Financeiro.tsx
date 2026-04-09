@@ -63,8 +63,8 @@ function buildMonthOptions(): { value: string; label: string }[] {
   return options;
 }
 
-export default function FinanceiroGestor() {
-  const { role, loading: authLoading } = useAuth();
+export default function Financeiro() {
+  const { role, user, loading: authLoading } = useAuth();
 
   if (authLoading) {
     return (
@@ -74,11 +74,218 @@ export default function FinanceiroGestor() {
     );
   }
 
-  if (role !== "gestor" && role !== "admin") {
-    return <Navigate to="/" replace />;
+  if (role === "user" && user) {
+    return <UserFinanceiroContent userId={user.id} />;
   }
 
   return <FinanceiroContent />;
+}
+
+function UserFinanceiroContent({ userId }: { userId: string }) {
+  const currentMonthKey = getMonthKey(new Date());
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+  const monthOptions = useMemo(() => buildMonthOptions(), []);
+
+  const [deals, setDeals] = useState<DealRow[]>([]);
+  const [salaries, setSalaries] = useState<SalaryRow[]>([]);
+  const [profiles, setProfiles] = useState<ProfileMap>({});
+  const [loading, setLoading] = useState(true);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [dealsRes, salariesRes, profilesRes] = await Promise.all([
+        supabase.from("deals").select("*").eq("user_id", userId).order("closing_date", { ascending: false }),
+        supabase.from("salary_payments").select("*").eq("user_id", userId),
+        supabase.from("profiles").select("user_id, full_name, display_name, commission_percent").eq("user_id", userId),
+      ]);
+
+      if (dealsRes.data) setDeals(dealsRes.data as any[]);
+      if (salariesRes.data) setSalaries(salariesRes.data as any[]);
+      if (profilesRes.data) {
+        const map: ProfileMap = {};
+        (profilesRes.data as any[]).forEach((p) => {
+          map[p.user_id] = {
+            full_name: p.full_name || p.display_name || "—",
+            display_name: p.display_name || "",
+            commission_percent: p.commission_percent || 20,
+          };
+        });
+        setProfiles(map);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao carregar dados financeiros");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const filteredDeals = useMemo(() => {
+    return deals.filter((d) => {
+      const fpKey = d.first_payment_date ? getMonthKey(d.first_payment_date) : null;
+      const ipKey = d.implantation_payment_date ? getMonthKey(d.implantation_payment_date) : null;
+      let hasInstallmentInMonth = false;
+      if (d.is_installment && Array.isArray(d.installment_dates)) {
+        hasInstallmentInMonth = d.installment_dates.some((inst: any) => {
+          const dateStr = inst?.date || inst;
+          return dateStr && getMonthKey(dateStr) === selectedMonth;
+        });
+      }
+      return fpKey === selectedMonth || ipKey === selectedMonth || hasInstallmentInMonth;
+    });
+  }, [deals, selectedMonth]);
+
+  const filteredSalaries = useMemo(() => {
+    return salaries.filter((s) => getMonthKey(s.reference_month) === selectedMonth);
+  }, [salaries, selectedMonth]);
+
+  const payableDeals = useMemo(() => {
+    return filteredDeals.filter((d) => d.is_mensalidade_paid_by_client || d.is_implantacao_paid_by_client);
+  }, [filteredDeals]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const getUserName = (id: string) => profiles[id]?.full_name || "—";
+
+  return (
+    <div className="container py-5">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-lg font-semibold">Meu Fluxo Individual</h2>
+        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {monthOptions.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-5">
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              Minhas Comissões (Destravadas)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="text-[11px]">Cliente</TableHead>
+                  <TableHead className="text-[11px]">Operação</TableHead>
+                  <TableHead className="text-[11px] text-right">Com. Mensalidade</TableHead>
+                  <TableHead className="text-[11px] text-right">Com. Implantação</TableHead>
+                  <TableHead className="text-[11px] text-center">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {payableDeals.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">
+                      Nenhuma comissão destravada para este mês.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  payableDeals.map((deal) => {
+                    const commPercent = (profiles[deal.user_id]?.commission_percent || 20) / 100;
+                    const mensalComm = deal.is_mensalidade_paid_by_client ? deal.monthly_value * commPercent : 0;
+                    const implComm = deal.is_implantacao_paid_by_client ? deal.implantation_value * 0.4 * commPercent : 0;
+                    const totalDeals = mensalComm + implComm;
+
+                    return (
+                      <TableRow key={deal.id}>
+                        <TableCell className="text-sm">{deal.client_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px]">{deal.operation}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-mono">
+                          {mensalComm > 0 ? formatCurrency(mensalComm) : "—"}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-mono">
+                          {implComm > 0 ? formatCurrency(implComm) : "—"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {deal.is_paid_to_user ? (
+                            <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
+                              <Check className="h-3 w-3 mr-1" /> Recebido
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-500/30 bg-yellow-500/10">A Receber</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-primary" />
+              Meu Salário Fixo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-0 pb-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="text-[11px] text-right">Valor</TableHead>
+                  <TableHead className="text-[11px]">Vencimento</TableHead>
+                  <TableHead className="text-[11px] text-center">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSalaries.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-6">
+                      Nenhum salário registrado para este mês.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredSalaries.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="text-right text-sm font-mono">{formatCurrency(s.amount)}</TableCell>
+                      <TableCell className="text-sm">{new Date(s.expected_payment_date + "T12:00:00").toLocaleDateString("pt-BR")}</TableCell>
+                      <TableCell className="text-center">
+                        {s.is_paid_by_gestor ? (
+                            <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
+                              <Check className="h-3 w-3 mr-1" /> Recebido
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-500/30 bg-yellow-500/10">A Receber</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
 }
 
 function FinanceiroContent() {
