@@ -14,56 +14,128 @@ export type Database = {
   }
   public: {
     Tables: {
+      calendar_events: {
+        Row: {
+          created_at: string | null
+          event_date: string
+          id: string
+          is_sandbox: boolean | null
+          meeting_link: string | null
+          operation: string | null
+          status: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_date: string
+          id?: string
+          is_sandbox?: boolean | null
+          meeting_link?: string | null
+          operation?: string | null
+          status?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          event_date?: string
+          id?: string
+          is_sandbox?: boolean | null
+          meeting_link?: string | null
+          operation?: string | null
+          status?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       deals: {
         Row: {
           client_name: string
+          client_payment_date: string | null
           closing_date: string
           created_at: string
+          expected_commission_date: string | null
           first_payment_date: string | null
           id: string
+          implantacao_payment_date: string | null
           implantation_payment_date: string | null
           implantation_value: number
           installment_count: number
           installment_dates: Json | null
+          is_commission_liberated: boolean | null
+          is_commission_received_by_company: boolean | null
+          is_implantacao_paid: boolean | null
+          is_implantacao_paid_by_client: boolean | null
           is_installment: boolean
+          is_mensalidade_paid: boolean | null
+          is_mensalidade_paid_by_client: boolean | null
+          is_paid_by_client: boolean | null
+          is_paid_to_user: boolean | null
+          mensalidade_payment_date: string | null
           monthly_value: number
           operation: string
           payment_status: string
           updated_at: string
+          user_confirmed_receipt: boolean | null
           user_id: string | null
         }
         Insert: {
           client_name: string
+          client_payment_date?: string | null
           closing_date?: string
           created_at?: string
+          expected_commission_date?: string | null
           first_payment_date?: string | null
           id?: string
+          implantacao_payment_date?: string | null
           implantation_payment_date?: string | null
           implantation_value?: number
           installment_count?: number
           installment_dates?: Json | null
+          is_commission_liberated?: boolean | null
+          is_commission_received_by_company?: boolean | null
+          is_implantacao_paid?: boolean | null
+          is_implantacao_paid_by_client?: boolean | null
           is_installment?: boolean
+          is_mensalidade_paid?: boolean | null
+          is_mensalidade_paid_by_client?: boolean | null
+          is_paid_by_client?: boolean | null
+          is_paid_to_user?: boolean | null
+          mensalidade_payment_date?: string | null
           monthly_value?: number
           operation?: string
           payment_status?: string
           updated_at?: string
+          user_confirmed_receipt?: boolean | null
           user_id?: string | null
         }
         Update: {
           client_name?: string
+          client_payment_date?: string | null
           closing_date?: string
           created_at?: string
+          expected_commission_date?: string | null
           first_payment_date?: string | null
           id?: string
+          implantacao_payment_date?: string | null
           implantation_payment_date?: string | null
           implantation_value?: number
           installment_count?: number
           installment_dates?: Json | null
+          is_commission_liberated?: boolean | null
+          is_commission_received_by_company?: boolean | null
+          is_implantacao_paid?: boolean | null
+          is_implantacao_paid_by_client?: boolean | null
           is_installment?: boolean
+          is_mensalidade_paid?: boolean | null
+          is_mensalidade_paid_by_client?: boolean | null
+          is_paid_by_client?: boolean | null
+          is_paid_to_user?: boolean | null
+          mensalidade_payment_date?: string | null
           monthly_value?: number
           operation?: string
           payment_status?: string
           updated_at?: string
+          user_confirmed_receipt?: boolean | null
           user_id?: string | null
         }
         Relationships: []
@@ -104,6 +176,95 @@ export type Database = {
         }
         Relationships: []
       }
+      kanban_columns: {
+        Row: {
+          created_at: string | null
+          id: string
+          position: number
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          position: number
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          position?: number
+          title?: string
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          column_id: string | null
+          company_name: string
+          contact_name: string | null
+          created_at: string | null
+          id: string
+          is_sandbox: boolean | null
+          notes: string | null
+          sdr_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          column_id?: string | null
+          company_name: string
+          contact_name?: string | null
+          created_at?: string | null
+          id?: string
+          is_sandbox?: boolean | null
+          notes?: string | null
+          sdr_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          column_id?: string | null
+          company_name?: string
+          contact_name?: string | null
+          created_at?: string | null
+          id?: string
+          is_sandbox?: boolean | null
+          notes?: string | null
+          sdr_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_column_id_fkey"
+            columns: ["column_id"]
+            isOneToOne: false
+            referencedRelation: "kanban_columns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          title?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -113,6 +274,7 @@ export type Database = {
           fixed_salary: number | null
           full_name: string | null
           id: string
+          is_sandbox: boolean | null
           job_title: string | null
           role: string | null
           updated_at: string
@@ -126,6 +288,7 @@ export type Database = {
           fixed_salary?: number | null
           full_name?: string | null
           id?: string
+          is_sandbox?: boolean | null
           job_title?: string | null
           role?: string | null
           updated_at?: string
@@ -139,9 +302,46 @@ export type Database = {
           fixed_salary?: number | null
           full_name?: string | null
           id?: string
+          is_sandbox?: boolean | null
           job_title?: string | null
           role?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      salary_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          expected_payment_date: string
+          id: string
+          is_paid_by_gestor: boolean | null
+          payment_date: string | null
+          reference_month: string
+          user_confirmed_receipt: boolean | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          expected_payment_date: string
+          id?: string
+          is_paid_by_gestor?: boolean | null
+          payment_date?: string | null
+          reference_month: string
+          user_confirmed_receipt?: boolean | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          expected_payment_date?: string
+          id?: string
+          is_paid_by_gestor?: boolean | null
+          payment_date?: string | null
+          reference_month?: string
+          user_confirmed_receipt?: boolean | null
           user_id?: string
         }
         Relationships: []
@@ -151,6 +351,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_commission_date: {
+        Args: { payment_date: string }
+        Returns: string
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
