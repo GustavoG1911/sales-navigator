@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Navigate } from "react-router-dom";
@@ -86,44 +87,39 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
 
-  const [deals, setDeals] = useState<DealRow[]>([]);
-  const [salaries, setSalaries] = useState<SalaryRow[]>([]);
-  const [profiles, setProfiles] = useState<ProfileMap>({});
-  const [loading, setLoading] = useState(true);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ["user-finance-data", userId],
+    queryFn: async () => {
       const [dealsRes, salariesRes, profilesRes] = await Promise.all([
         supabase.from("deals").select("*").eq("user_id", userId).order("closing_date", { ascending: false }),
         supabase.from("salary_payments").select("*").eq("user_id", userId),
         supabase.from("profiles").select("user_id, full_name, display_name, commission_percent").eq("user_id", userId),
       ]);
 
-      if (dealsRes.data) setDeals(dealsRes.data as any[]);
-      if (salariesRes.data) setSalaries(salariesRes.data as any[]);
-      if (profilesRes.data) {
-        const map: ProfileMap = {};
-        (profilesRes.data as any[]).forEach((p) => {
-          map[p.user_id] = {
-            full_name: p.full_name || p.display_name || "—",
-            display_name: p.display_name || "",
-            commission_percent: p.commission_percent || 20,
-          };
-        });
-        setProfiles(map);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Erro ao carregar dados financeiros");
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (dealsRes.error) throw dealsRes.error;
+      if (salariesRes.error) throw salariesRes.error;
+      if (profilesRes.error) throw profilesRes.error;
 
-  useEffect(() => {
-    loadData();
-  }, []);
+      const map: ProfileMap = {};
+      (profilesRes.data as any[]).forEach((p) => {
+        map[p.user_id] = {
+          full_name: p.full_name || p.display_name || "—",
+          display_name: p.display_name || "",
+          commission_percent: p.commission_percent || 20,
+        };
+      });
+
+      return {
+        deals: dealsRes.data as any[],
+        salaries: salariesRes.data as any[],
+        profiles: map,
+      };
+    }
+  });
+
+  const deals = data?.deals || [];
+  const salaries = data?.salaries || [];
+  const profiles = data?.profiles || {};
 
   const filteredDeals = useMemo(() => {
     return deals.filter((d) => {
@@ -300,44 +296,41 @@ function FinanceiroContent() {
   
   const monthOptions = useMemo(() => buildMonthOptions(), []);
 
-  const [deals, setDeals] = useState<DealRow[]>([]);
-  const [salaries, setSalaries] = useState<SalaryRow[]>([]);
-  const [profiles, setProfiles] = useState<ProfileMap>({});
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ["finance-data"],
+    queryFn: async () => {
       const [dealsRes, salariesRes, profilesRes] = await Promise.all([
         supabase.from("deals").select("*").order("closing_date", { ascending: false }),
         supabase.from("salary_payments").select("*"),
         supabase.from("profiles").select("user_id, full_name, display_name, commission_percent"),
       ]);
 
-      if (dealsRes.data) setDeals(dealsRes.data as any[]);
-      if (salariesRes.data) setSalaries(salariesRes.data as any[]);
-      if (profilesRes.data) {
-        const map: ProfileMap = {};
-        (profilesRes.data as any[]).forEach((p) => {
-          map[p.user_id] = {
-            full_name: p.full_name || p.display_name || "—",
-            display_name: p.display_name || "",
-            commission_percent: p.commission_percent || 20,
-          };
-        });
-        setProfiles(map);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Erro ao carregar dados financeiros");
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (dealsRes.error) throw dealsRes.error;
+      if (salariesRes.error) throw salariesRes.error;
+      if (profilesRes.error) throw profilesRes.error;
 
-  useEffect(() => {
-    loadData();
-  }, []);
+      const map: ProfileMap = {};
+      (profilesRes.data as any[]).forEach((p) => {
+        map[p.user_id] = {
+          full_name: p.full_name || p.display_name || "—",
+          display_name: p.display_name || "",
+          commission_percent: p.commission_percent || 20,
+        };
+      });
+
+      return {
+        deals: dealsRes.data as any[],
+        salaries: salariesRes.data as any[],
+        profiles: map,
+      };
+    }
+  });
+
+  const deals = data?.deals || [];
+  const salaries = data?.salaries || [];
+  const profiles = data?.profiles || {};
 
   // Filter deals relevant to selected month and cross-filters
   const filteredDeals = useMemo(() => {
@@ -433,7 +426,7 @@ function FinanceiroContent() {
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }
     toast.success("Recebimento de mensalidade confirmado!");
-    loadData();
+    queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
   const handleConfirmImplantacao = async (dealId: string) => {
@@ -443,7 +436,7 @@ function FinanceiroContent() {
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }
     toast.success("Recebimento de implantação confirmado!");
-    loadData();
+    queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
   const handleConfirmInstallment = async (dealId: string, index: number, checked: boolean) => {
@@ -459,27 +452,29 @@ function FinanceiroContent() {
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }
     toast.success(checked ? "Parcela confirmada!" : "Parcela desmarcada");
-    loadData();
+    queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
-  const handleMarkPaidToUser = async (dealId: string, checked: boolean) => {
+  const handleToggleCommissionPayment = async (dealId: string, currentStatus: boolean) => {
+    const newStatus = !currentStatus;
     const { error } = await supabase
       .from("deals")
-      .update({ is_paid_to_user: checked } as any)
+      .update({ is_paid_to_user: newStatus } as any)
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }
-    toast.success(checked ? "Transferência marcada!" : "Transferência desmarcada");
-    loadData();
+    toast.success(newStatus ? "Comissão paga com sucesso!" : "Baixa de comissão desmarcada");
+    queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
-  const handleMarkSalaryPaid = async (salaryId: string, checked: boolean) => {
+  const handleToggleSalaryPayment = async (salaryId: string, currentStatus: boolean) => {
+    const newStatus = !currentStatus;
     const { error } = await supabase
       .from("salary_payments")
-      .update({ is_paid_by_gestor: checked, payment_date: checked ? new Date().toISOString() : null } as any)
+      .update({ is_paid_by_gestor: newStatus, payment_date: newStatus ? new Date().toISOString() : null } as any)
       .eq("id", salaryId);
     if (error) { toast.error("Erro: " + error.message); return; }
-    toast.success(checked ? "Salário marcado como pago!" : "Salário desmarcado");
-    loadData();
+    toast.success(newStatus ? "Salário marcado como pago com sucesso!" : "Baixa de salário desmarcada");
+    queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
   const getUserName = (userId: string) => profiles[userId]?.full_name || "—";
@@ -611,8 +606,8 @@ function FinanceiroContent() {
             salaries={filteredSalaries}
             profiles={profiles}
             getUserName={getUserName}
-            onMarkPaidToUser={handleMarkPaidToUser}
-            onMarkSalaryPaid={handleMarkSalaryPaid}
+            onToggleCommissionPayment={handleToggleCommissionPayment}
+            onToggleSalaryPayment={handleToggleSalaryPayment}
           />
         </TabsContent>
       </Tabs>
@@ -742,11 +737,11 @@ interface PayablesTabProps {
   salaries: SalaryRow[];
   profiles: ProfileMap;
   getUserName: (id: string) => string;
-  onMarkPaidToUser: (dealId: string, checked: boolean) => void;
-  onMarkSalaryPaid: (salaryId: string, checked: boolean) => void;
+  onToggleCommissionPayment: (dealId: string, currentStatus: boolean) => void;
+  onToggleSalaryPayment: (salaryId: string, currentStatus: boolean) => void;
 }
 
-function PayablesTab({ deals, salaries, profiles, getUserName, onMarkPaidToUser, onMarkSalaryPaid }: PayablesTabProps) {
+function PayablesTab({ deals, salaries, profiles, getUserName, onToggleCommissionPayment, onToggleSalaryPayment }: PayablesTabProps) {
   return (
     <div className="space-y-5">
       {/* Commissions */}
@@ -798,7 +793,7 @@ function PayablesTab({ deals, salaries, profiles, getUserName, onMarkPaidToUser,
                       <TableCell className="text-center">
                         <Checkbox
                           checked={deal.is_paid_to_user || false}
-                          onCheckedChange={(checked) => onMarkPaidToUser(deal.id, !!checked)}
+                          onCheckedChange={() => onToggleCommissionPayment(deal.id, deal.is_paid_to_user || false)}
                         />
                       </TableCell>
                     </TableRow>
@@ -844,7 +839,7 @@ function PayablesTab({ deals, salaries, profiles, getUserName, onMarkPaidToUser,
                     <TableCell className="text-center">
                       <Checkbox
                         checked={s.is_paid_by_gestor || false}
-                        onCheckedChange={(checked) => onMarkSalaryPaid(s.id, !!checked)}
+                        onCheckedChange={() => onToggleSalaryPayment(s.id, s.is_paid_by_gestor || false)}
                       />
                     </TableCell>
                   </TableRow>
