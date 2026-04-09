@@ -5,6 +5,9 @@ import { KpiCard } from "@/components/KpiCard";
 import { PresentationsCard } from "@/components/PresentationsCard";
 import { OperationsChart } from "@/components/OperationsChart";
 import { DealsTable } from "@/components/DealsTable";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { format } from "date-fns";
 import { DealFormDialog } from "@/components/DealFormDialog";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { PeriodFilter, DateRange, PeriodType } from "@/components/PeriodFilter";
@@ -58,6 +61,8 @@ export default function Index() {
   const [periodType, setPeriodType] = useState<PeriodType>("month");
   const [formOpen, setFormOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
+  
+  const [kpiModalType, setKpiModalType] = useState<"projected" | "paid" | "deals" | null>(null);
 
   const periodSuffix = periodType === "month" ? "do Mês" : periodType === "quarter" ? "do Trimestre" : periodType === "year" ? "do Ano" : "do Período";
 
@@ -159,6 +164,21 @@ export default function Index() {
 
   const handleStatusChange = (deal: Deal, status: PaymentStatus) => {
     addOrUpdateDeal({ ...deal, paymentStatus: status });
+  };
+
+  const detailDeals = useMemo(() => {
+    if (!kpiModalType) return [];
+    return filteredDeals.filter(d => {
+      if (kpiModalType === "paid") return d.paymentStatus === "Pago";
+      if (kpiModalType === "projected") return d.paymentStatus !== "Pago";
+      return true;
+    });
+  }, [filteredDeals, kpiModalType]);
+
+  const kpiModalTitles = {
+    projected: "Comissão Projetada (Pendente)",
+    paid: "Comissão Destravada (Paga)",
+    deals: `Fechamentos ${periodSuffix}`
   };
 
   const handleEdit = (deal: Deal) => {
@@ -275,10 +295,7 @@ export default function Index() {
                 title={`FECHAMENTOS ${periodSuffix.toUpperCase()}`}
                 value={filteredDeals.length.toString()} 
                 icon={BarChart3} 
-                onClick={() => {
-                  const el = document.getElementById("deals-table-container");
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }}
+                onClick={() => setKpiModalType("deals")}
                 tooltip="Volume de negócios concretizados no período selecionado."
               />
               <KpiCard 
@@ -286,6 +303,7 @@ export default function Index() {
                 value={formatCurrency(kpis.projected)} 
                 icon={TrendingUp} 
                 variant="primary" 
+                onClick={() => setKpiModalType("projected")}
                 tooltip="Soma das comissões e implantações de negócios fechados no período que ainda não foram pagos."
               />
               <KpiCard 
@@ -293,6 +311,7 @@ export default function Index() {
                 value={formatCurrency(kpis.paid)} 
                 icon={BadgeDollarSign} 
                 variant="success" 
+                onClick={() => setKpiModalType("paid")}
                 tooltip="Soma das comissões e implantações que já constam como recebidas/pagas."
               />
               <KpiCard 
@@ -304,6 +323,45 @@ export default function Index() {
               />
             </div>
           </div>
+
+          <Dialog open={!!kpiModalType} onOpenChange={(open) => !open && setKpiModalType(null)}>
+            <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle>{kpiModalType ? kpiModalTitles[kpiModalType] : ""}</DialogTitle>
+                <DialogDescription>
+                  Listagem detalhada dos negócios que compõem este KPI.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Data</TableHead>
+                      <TableHead className="text-xs">Cliente</TableHead>
+                      <TableHead className="text-xs">Operação</TableHead>
+                      <TableHead className="text-xs text-right">Mensal</TableHead>
+                      <TableHead className="text-xs text-right">Implantação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detailDeals.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center text-xs py-8">Nenhum registro encontrado.</TableCell></TableRow>
+                    ) : (
+                      detailDeals.map(d => (
+                        <TableRow key={d.id}>
+                          <TableCell className="text-xs text-muted-foreground">{format(new Date(d.closingDate), "dd/MM/yyyy")}</TableCell>
+                          <TableCell className="text-xs font-medium">{d.clientName}</TableCell>
+                          <TableCell className="text-xs">{d.operation}</TableCell>
+                          <TableCell className="text-xs font-mono text-right">{formatCurrency(d.monthlyValue)}</TableCell>
+                          <TableCell className="text-xs font-mono text-right">{formatCurrency(d.implantationValue)}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
             {/* Volume Chart */}

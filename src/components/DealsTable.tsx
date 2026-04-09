@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +53,8 @@ function CommissionDetail({ deal, comm }: { deal: Deal; comm: ReturnType<typeof 
 
 export function DealsTable({ deals, presentations, settings, superMetaActive, onEdit, onDelete, onStatusChange }: DealsTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { role } = useAuth();
+  const isAdminOrGestor = role === "admin" || role === "gestor";
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -80,7 +83,14 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                 <TableHead className="px-3 py-2.5 text-xs text-right w-[100px]">Mensalidade</TableHead>
                 <TableHead className="px-3 py-2.5 text-xs text-right w-[100px]">Implantação</TableHead>
                 <TableHead className="px-3 py-2.5 text-xs text-right w-[110px]">Comissão</TableHead>
-                <TableHead className="px-3 py-2.5 text-xs text-right w-[110px]">Status</TableHead>
+                {isAdminOrGestor ? (
+                  <>
+                    <TableHead className="px-3 py-2.5 text-xs text-right w-[110px]">Status Cliente</TableHead>
+                    <TableHead className="px-3 py-2.5 text-xs text-right w-[110px]">Status Comissão</TableHead>
+                  </>
+                ) : (
+                  <TableHead className="px-3 py-2.5 text-xs text-right w-[110px]">Situação</TableHead>
+                )}
                 <TableHead className="px-2 py-2.5 w-[64px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -124,21 +134,42 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                           <span className="block text-[10px] text-warning font-medium">+{formatCurrency(comm.superMetaBonus)} super</span>
                         )}
                       </TableCell>
-                      <TableCell className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                        <Select
-                          value={deal.paymentStatus}
-                          onValueChange={(v) => onStatusChange(deal, v as PaymentStatus)}
-                        >
-                          <SelectTrigger className="h-7 w-[100px] text-xs ml-auto">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Pendente">Pendente</SelectItem>
-                            <SelectItem value="Pago">Pago</SelectItem>
-                            <SelectItem value="Cancelado">Cancelado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
+                      {isAdminOrGestor ? (
+                        <>
+                          <TableCell className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                            <Select
+                              value={deal.paymentStatus}
+                              onValueChange={(v) => onStatusChange(deal, v as PaymentStatus)}
+                            >
+                              <SelectTrigger className="h-7 w-[100px] text-xs ml-auto">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Pendente">Pendente</SelectItem>
+                                <SelectItem value="Pago">Pago</SelectItem>
+                                <SelectItem value="Cancelado">Cancelado</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="px-3 py-2.5 text-right">
+                            {deal.isUserConfirmedPayment ? (
+                              <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">Recebido</Badge>
+                            ) : deal.isPaidToUser ? (
+                              <Badge variant="outline" className="text-[10px] text-orange-600 border-orange-500/30 bg-orange-500/10">Aguardando SDR</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-500/30 bg-yellow-500/10">A Pagar</Badge>
+                            )}
+                          </TableCell>
+                        </>
+                      ) : (
+                        <TableCell className="px-3 py-2.5 text-right">
+                          {deal.isUserConfirmedPayment ? (
+                            <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">Recebida</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-500/30 bg-yellow-500/10">Pendente</Badge>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-0.5">
                           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(deal)}>

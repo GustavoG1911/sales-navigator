@@ -15,6 +15,7 @@ import { ArrowDownToLine, ArrowUpFromLine, Check, Loader2, DollarSign, Wallet } 
 import { toast } from "sonner";
 import { formatCurrency, getMonthKey, formatMonthLabel, getPaymentDateInfo, getCommissionTier } from "@/lib/commission";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
@@ -148,6 +149,29 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
     return filteredDeals.filter((d) => d.is_mensalidade_paid_by_client || d.is_implantacao_paid_by_client);
   }, [filteredDeals]);
 
+  const futureProjections = useMemo(() => {
+    const projMap: Record<string, { projectedIn: number }> = {};
+    deals.forEach((deal) => {
+      const baseDate = deal.first_payment_date || deal.implantation_payment_date;
+      if (!baseDate) return;
+      const { monthKey } = getPaymentDateInfo(baseDate);
+      if (monthKey > selectedMonth) {
+        if (!projMap[monthKey]) projMap[monthKey] = { projectedIn: 0 };
+        
+        const commissionRate = deal.commission_rate_snapshot ?? ((profiles[deal.user_id]?.commission_percent || 20) / 100);
+        // Na visão do SDR, "Entradas" significam suas próprias comissões
+        const baseMonthlyComm = deal.commission_amount_snapshot ? (deal.commission_amount_snapshot * (deal.monthly_value/(deal.monthly_value + (deal.implantation_value*0.4)))) : (deal.monthly_value * commissionRate);
+        const baseImplComm = deal.commission_amount_snapshot ? (deal.commission_amount_snapshot * ((deal.implantation_value*0.4)/(deal.monthly_value + (deal.implantation_value*0.4)))) : ((deal.implantation_value * 0.4) * commissionRate);
+        
+        projMap[monthKey].projectedIn += deal.commission_amount_snapshot ?? (baseMonthlyComm + baseImplComm);
+      }
+    });
+
+    return Object.entries(projMap)
+      .map(([key, vals]) => ({ monthKey: key, ...vals }))
+      .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  }, [deals, selectedMonth, profiles]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -155,6 +179,16 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
       </div>
     );
   }
+
+  const handleSDRConfirm = async (dealId: string) => {
+    const { error } = await supabase.from("deals").update({ is_user_confirmed_payment: true } as any).eq("id", dealId);
+    if (error) {
+      toast.error("Erro: " + error.message);
+      return;
+    }
+    toast.success("Recebimento confirmado e ciclo encerrado!");
+    queryClient.invalidateQueries({ queryKey: ["finance-data"] });
+  };
 
   const getUserName = (id: string) => profiles[id]?.full_name || "—";
 
@@ -175,6 +209,25 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
           </SelectContent>
         </Select>
       </div>
+
+      {futureProjections.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Lançamentos Futuros</h3>
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            {futureProjections.map((proj) => (
+              <Card key={proj.monthKey} className="min-w-[180px] cursor-pointer hover:border-primary transition-colors bg-card/40" onClick={() => setSelectedMonth(proj.monthKey)}>
+                <CardContent className="p-4 flex flex-col gap-2">
+                  <p className="font-semibold text-foreground/90 uppercase tracking-widest text-[11px] mb-1">{formatMonthLabel(proj.monthKey)}</p>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Comissões a Receber</span>
+                    <span className="font-mono text-emerald-600 font-bold">{formatCurrency(proj.projectedIn)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-5">
         <Card>
@@ -204,7 +257,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                   </TableRow>
                 ) : (
                   payableDeals.map((deal) => {
-                    const commPercent = (profiles[deal.user_id]?.commission_percent || 20) / 100;
+                    const commPercent = deal.commission_rate_snapshot ?? ((profiles[deal.user_id]?.commission_percent || 20) / 100);
                     const mensalComm = deal.is_mensalidade_paid_by_client ? deal.monthly_value * commPercent : 0;
                     const implComm = deal.is_implantacao_paid_by_client ? deal.implantation_value * 0.4 * commPercent : 0;
                     const totalDeals = mensalComm + implComm;
@@ -222,10 +275,14 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                           {implComm > 0 ? formatCurrency(implComm) : "—"}
                         </TableCell>
                         <TableCell className="text-center">
-                          {deal.is_paid_to_user ? (
+                          {deal.is_user_confirmed_payment ? (
                             <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
                               <Check className="h-3 w-3 mr-1" /> Recebido
                             </Badge>
+                          ) : deal.is_paid_to_user ? (
+                            <Button size="sm" onClick={() => handleSDRConfirm(deal.id)} className="h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700">
+                              Confirmar Recebimento
+                            </Button>
                           ) : (
                             <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-500/30 bg-yellow-500/10">A Receber</Badge>
                           )}
@@ -297,6 +354,7 @@ function FinanceiroContent() {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [filtroOperacao, setFiltroOperacao] = useState("Todas");
   const [filtroFuncionario, setFiltroFuncionario] = useState("Todos");
+  const [kpiModalType, setKpiModalType] = useState<"volume" | "pago" | "projetado" | "fixo" | null>(null);
   
   const monthOptions = useMemo(() => buildMonthOptions(), []);
 
@@ -400,7 +458,7 @@ function FinanceiroContent() {
       const smeta = deal.operation === "BluePex" ? bpSuperMeta : opSuperMeta;
 
       const tier = getCommissionTier(presCount, meta, smeta);
-      const commissionRate = (profiles[deal.user_id]?.commission_percent || 20) / 100;
+      const commissionRate = deal.commission_rate_snapshot ?? ((profiles[deal.user_id]?.commission_percent || 20) / 100);
 
       const baseMonthlyComm = (deal.monthly_value * Math.min(tier.rate, 1.0)) * commissionRate;
       const baseImplComm = (deal.implantation_value * 0.4) * commissionRate;
@@ -418,28 +476,78 @@ function FinanceiroContent() {
     return { totalFixo, totalProjetado, totalPago, volumeTotal };
   }, [filteredDeals, filteredSalaries, selectedMonth, globalParams, presentations, profiles]);
 
+  const futureProjections = useMemo(() => {
+    const projMap: Record<string, { projectedIn: number, projectedOut: number }> = {};
+    deals.forEach((deal) => {
+      const baseDate = deal.first_payment_date || deal.implantation_payment_date;
+      if (!baseDate) return;
+      const { monthKey } = getPaymentDateInfo(baseDate);
+      if (monthKey > selectedMonth) {
+        if (!projMap[monthKey]) projMap[monthKey] = { projectedIn: 0, projectedOut: 0 };
+        projMap[monthKey].projectedIn += deal.monthly_value + deal.implantation_value;
+
+        const bpMeta = globalParams?.meta_apresentacoes_bluepex || 15;
+        const bpSuperMeta = globalParams?.super_meta_bluepex || 30;
+        const opMeta = globalParams?.meta_apresentacoes_opus || 15;
+        const opSuperMeta = globalParams?.super_meta_opus || 30;
+
+        const presMonth = presentations[monthKey] || { bluepex: 0, opus: 0 };
+        const presCount = deal.operation === "BluePex" ? presMonth.bluepex : presMonth.opus;
+        const meta = deal.operation === "BluePex" ? bpMeta : opMeta;
+        const smeta = deal.operation === "BluePex" ? bpSuperMeta : opSuperMeta;
+
+        const tier = getCommissionTier(presCount, meta, smeta);
+        const commissionRate = (profiles[deal.user_id]?.commission_percent || 20) / 100;
+
+        const baseMonthlyComm = (deal.monthly_value * Math.min(tier.rate, 1.0)) * commissionRate;
+        const baseImplComm = (deal.implantation_value * 0.4) * commissionRate;
+        const superMetaBonus = tier.rate >= 2.0 ? baseMonthlyComm : 0;
+
+        projMap[monthKey].projectedOut += baseMonthlyComm + baseImplComm + superMetaBonus;
+      }
+    });
+
+    return Object.entries(projMap)
+      .map(([key, vals]) => ({ monthKey: key, ...vals }))
+      .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  }, [deals, selectedMonth, globalParams, presentations, profiles]);
+
   // Deals with confirmed client payment (ready for payout)
   const payableDeals = useMemo(() => {
     return filteredDeals.filter((d) => d.is_mensalidade_paid_by_client || d.is_implantacao_paid_by_client);
   }, [filteredDeals]);
 
-  const handleConfirmMensalidade = async (dealId: string) => {
+  const handleToggleMensalidade = async (dealId: string, currentStatus: boolean) => {
+    if (currentStatus) {
+      if (!confirm("Confirma o cancelamento deste recebimento revertendo-o para Pendente?")) return;
+    }
+    const newStatus = !currentStatus;
     const { error } = await supabase
       .from("deals")
-      .update({ is_mensalidade_paid_by_client: true } as any)
+      .update({ 
+        is_mensalidade_paid_by_client: newStatus,
+        actual_payment_date: newStatus ? new Date().toISOString() : null
+      } as any)
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }
-    toast.success("Recebimento de mensalidade confirmado!");
+    toast.success(newStatus ? "Recebimento confirmado!" : "Revertido para Pendente");
     queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
-  const handleConfirmImplantacao = async (dealId: string) => {
+  const handleToggleImplantacao = async (dealId: string, currentStatus: boolean) => {
+    if (currentStatus) {
+      if (!confirm("Confirma o cancelamento deste recebimento revertendo-o para Pendente?")) return;
+    }
+    const newStatus = !currentStatus;
     const { error } = await supabase
       .from("deals")
-      .update({ is_implantacao_paid_by_client: true } as any)
+      .update({ 
+        is_implantacao_paid_by_client: newStatus,
+        actual_payment_date: newStatus ? new Date().toISOString() : null
+      } as any)
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }
-    toast.success("Recebimento de implantação confirmado!");
+    toast.success(newStatus ? "Recebimento confirmado!" : "Revertido para Pendente");
     queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
@@ -461,11 +569,15 @@ function FinanceiroContent() {
 
   const handleToggleCommissionPayment = async (dealId: string, currentStatus: boolean, specificDate?: string) => {
     const newStatus = !currentStatus;
+    if (!newStatus) {
+      if (!confirm("Confirma o cancelamento do pagamento desta comissão revertendo-a para Pendente?")) return;
+    }
     const { error } = await supabase
       .from("deals")
       .update({ 
         is_paid_to_user: newStatus,
-        user_payment_date: newStatus ? (specificDate || new Date().toISOString()) : null
+        user_payment_date: newStatus ? (specificDate || new Date().toISOString()) : null,
+        actual_payment_date: newStatus ? (specificDate || new Date().toISOString()) : null
       } as any)
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }
@@ -539,7 +651,7 @@ function FinanceiroContent() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="bg-card">
+        <Card className="bg-card cursor-pointer hover:border-primary transition-colors hover:shadow-md" onClick={() => setKpiModalType("volume")}>
           <CardHeader className="py-3 px-4 pb-0">
             <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
               Volume Bruto (Mês)
@@ -550,7 +662,7 @@ function FinanceiroContent() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-emerald-500/20">
+        <Card className="bg-card border-emerald-500/20 cursor-pointer hover:border-emerald-500 transition-colors hover:shadow-md" onClick={() => setKpiModalType("pago")}>
           <CardHeader className="py-3 px-4 pb-0">
             <CardTitle className="text-xs font-semibold text-emerald-600 flex items-center gap-1.5 uppercase tracking-wide">
               <Check className="h-3.5 w-3.5" /> Pago/Recebido
@@ -561,7 +673,7 @@ function FinanceiroContent() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border-yellow-500/20">
+        <Card className="bg-card border-yellow-500/20 cursor-pointer hover:border-yellow-500 transition-colors hover:shadow-md" onClick={() => setKpiModalType("projetado")}>
           <CardHeader className="py-3 px-4 pb-0">
             <CardTitle className="text-xs font-semibold text-yellow-600 flex items-center gap-1.5 uppercase tracking-wide">
               <ArrowDownToLine className="h-3.5 w-3.5" /> Projetado (Pendente)
@@ -572,7 +684,7 @@ function FinanceiroContent() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card">
+        <Card className="bg-card cursor-pointer hover:border-primary transition-colors hover:shadow-md" onClick={() => setKpiModalType("fixo")}>
           <CardHeader className="py-3 px-4 pb-0">
             <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
               <Wallet className="h-3.5 w-3.5" /> Salários Fixos
@@ -583,6 +695,29 @@ function FinanceiroContent() {
           </CardContent>
         </Card>
       </div>
+
+      {futureProjections.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Lançamentos Futuros</h3>
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            {futureProjections.map((proj) => (
+              <Card key={proj.monthKey} className="min-w-[200px] cursor-pointer hover:border-primary transition-colors bg-card/40" onClick={() => setSelectedMonth(proj.monthKey)}>
+                <CardContent className="p-4 flex flex-col gap-2">
+                  <p className="font-semibold text-foreground/90 uppercase tracking-widest text-[11px] mb-1">{formatMonthLabel(proj.monthKey)}</p>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Entradas</span>
+                    <span className="font-mono text-emerald-600">{formatCurrency(proj.projectedIn)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Saídas</span>
+                    <span className="font-mono text-destructive">{formatCurrency(proj.projectedOut)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Tabs defaultValue="receivables">
         <TabsList className="h-9 mb-5">
@@ -601,8 +736,8 @@ function FinanceiroContent() {
             deals={filteredDeals}
             selectedMonth={selectedMonth}
             getUserName={getUserName}
-            onConfirmMensalidade={handleConfirmMensalidade}
-            onConfirmImplantacao={handleConfirmImplantacao}
+            onToggleMensalidade={handleToggleMensalidade}
+            onToggleImplantacao={handleToggleImplantacao}
             onConfirmInstallment={handleConfirmInstallment}
           />
         </TabsContent>
@@ -620,6 +755,101 @@ function FinanceiroContent() {
           />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={kpiModalType !== null} onOpenChange={(open) => !open && setKpiModalType(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg flex items-center gap-2">
+              {kpiModalType === "volume" && "Detalhamento: Volume Bruto (Mês)"}
+              {kpiModalType === "pago" && "Detalhamento: Pago/Recebido"}
+              {kpiModalType === "projetado" && "Detalhamento: Projetado (Pendente)"}
+              {kpiModalType === "fixo" && "Detalhamento: Salários Fixos"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            {kpiModalType === "fixo" ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>SDR</TableHead>
+                    <TableHead className="text-right">Salário</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredSalaries.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell>{getUserName(s.user_id)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(s.amount)}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={s.is_paid_by_gestor ? "default" : "outline"} className={s.is_paid_by_gestor ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : ""}>
+                          {s.is_paid_by_gestor ? "Pago" : "Pendente"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Operação</TableHead>
+                    <TableHead>SDR</TableHead>
+                    <TableHead className="text-right">Comissão / Verba</TableHead>
+                    <TableHead className="text-center">Status Pagamento</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredDeals
+                    .filter((d) => {
+                      if (kpiModalType === "volume") return true;
+                      if (kpiModalType === "pago") return d.is_paid_to_user === true;
+                      if (kpiModalType === "projetado") return d.is_paid_to_user === false;
+                      return false;
+                    })
+                    .map((d) => {
+                      const commRate = d.commission_rate_snapshot ?? ((profiles[d.user_id]?.commission_percent || 20) / 100);
+                      const bpMeta = globalParams?.meta_apresentacoes_bluepex || 15;
+                      const bpSuperMeta = globalParams?.super_meta_bluepex || 30;
+                      const opMeta = globalParams?.meta_apresentacoes_opus || 15;
+                      const opSuperMeta = globalParams?.super_meta_opus || 30;
+                      
+                      const monthK = getPaymentDateInfo(d.first_payment_date || d.implantation_payment_date || d.closing_date).monthKey;
+                      const presMonth = presentations[monthK] || { bluepex: 0, opus: 0 };
+                      const presCount = d.operation === "BluePex" ? presMonth.bluepex : presMonth.opus;
+                      const tier = getCommissionTier(presCount, d.operation === "BluePex" ? bpMeta : opMeta, d.operation === "BluePex" ? bpSuperMeta : opSuperMeta);
+                      
+                      const mComm = (d.monthly_value * Math.min(tier.rate, 1.0)) * commRate;
+                      const iComm = (d.implantation_value * 0.4) * commRate;
+                      const sBonus = tier.rate >= 2.0 ? mComm : 0;
+                      const val = d.commission_amount_snapshot ?? (mComm + iComm + sBonus);
+
+                      return (
+                        <TableRow key={d.id}>
+                          <TableCell className="font-medium">{d.client_name}</TableCell>
+                          <TableCell><Badge variant="outline" className="text-[10px]">{d.operation}</Badge></TableCell>
+                          <TableCell>{getUserName(d.user_id)}</TableCell>
+                          <TableCell className="text-right font-mono text-primary font-medium">{formatCurrency(val)}</TableCell>
+                          <TableCell className="text-center">
+                            {d.is_user_confirmed_payment ? (
+                              <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">Recebido (SDR)</Badge>
+                            ) : d.is_paid_to_user ? (
+                              <Badge variant="outline" className="text-[10px] text-orange-600 border-orange-500/30 bg-orange-500/10">Aguardando SDR</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px]">Pendente</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -630,12 +860,12 @@ interface ReceivablesTabProps {
   deals: DealRow[];
   selectedMonth: string;
   getUserName: (id: string) => string;
-  onConfirmMensalidade: (id: string) => void;
-  onConfirmImplantacao: (id: string) => void;
+  onToggleMensalidade: (id: string, currentStatus: boolean) => void;
+  onToggleImplantacao: (id: string, currentStatus: boolean) => void;
   onConfirmInstallment: (id: string, index: number, checked: boolean) => void;
 }
 
-function ReceivablesTab({ deals, selectedMonth, getUserName, onConfirmMensalidade, onConfirmImplantacao, onConfirmInstallment }: ReceivablesTabProps) {
+function ReceivablesTab({ deals, selectedMonth, getUserName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: ReceivablesTabProps) {
   if (deals.length === 0) {
     return (
       <Card>
@@ -669,11 +899,14 @@ function ReceivablesTab({ deals, selectedMonth, getUserName, onConfirmMensalidad
                   <p className="text-[10px] text-muted-foreground">Venc.: {format(new Date(deal.first_payment_date + "T12:00:00"), "dd/MM/yyyy")}</p>
                 </div>
                 {deal.is_mensalidade_paid_by_client ? (
-                  <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
+                  <Badge 
+                    className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] cursor-pointer hover:bg-emerald-500/20"
+                    onClick={() => onToggleMensalidade(deal.id, true)}
+                  >
                     <Check className="h-3 w-3 mr-1" /> Recebido
                   </Badge>
                 ) : (
-                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => onConfirmMensalidade(deal.id)}>
+                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => onToggleMensalidade(deal.id, false)}>
                     Confirmar Recebimento
                   </Button>
                 )}
@@ -689,11 +922,14 @@ function ReceivablesTab({ deals, selectedMonth, getUserName, onConfirmMensalidad
                   <p className="text-[10px] text-muted-foreground">Venc.: {format(new Date(deal.implantation_payment_date + "T12:00:00"), "dd/MM/yyyy")}</p>
                 </div>
                 {deal.is_implantacao_paid_by_client ? (
-                  <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
+                  <Badge 
+                    className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] cursor-pointer hover:bg-emerald-500/20"
+                    onClick={() => onToggleImplantacao(deal.id, true)}
+                  >
                     <Check className="h-3 w-3 mr-1" /> Recebido
                   </Badge>
                 ) : (
-                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => onConfirmImplantacao(deal.id)}>
+                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => onToggleImplantacao(deal.id, false)}>
                     Confirmar Recebimento
                   </Button>
                 )}
@@ -777,13 +1013,13 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
   const smeta = deal.operation === "BluePex" ? bpSuperMeta : opSuperMeta;
 
   const tier = getCommissionTier(presCount, meta, smeta);
-  const commissionRate = (profile?.commission_percent || 20) / 100;
+  const commissionRate = deal.commission_rate_snapshot ?? ((profile?.commission_percent || 20) / 100);
 
   const baseMonthlyComm = Math.round((deal.monthly_value * Math.min(tier.rate, 1.0)) * commissionRate * 100) / 100;
   const baseImplComm = Math.round((deal.implantation_value * 0.4) * commissionRate * 100) / 100;
   const superMetaBonus = tier.rate >= 2.0 ? baseMonthlyComm : 0;
   // Fallback: se for dado legado sem data, ele mapeia a linha mas zera comissão pra evitar erro.
-  const dealComiss = baseDate ? baseMonthlyComm + baseImplComm + superMetaBonus : 0;
+  const dealComiss = deal.commission_amount_snapshot ?? (baseDate ? baseMonthlyComm + baseImplComm + superMetaBonus : 0);
 
   return (
     <>
@@ -802,8 +1038,8 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
         <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
           <Popover>
             <PopoverTrigger asChild>
-              <Button size="sm" variant={deal.is_paid_to_user ? "outline" : "default"} className={`h-7 text-xs ${deal.is_paid_to_user ? 'text-emerald-600 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 hover:text-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
-                {deal.is_paid_to_user ? "Pago" : "Dar Baixa"}
+              <Button size="sm" variant={deal.is_user_confirmed_payment ? "outline" : "default"} className={`h-7 text-xs ${deal.is_user_confirmed_payment ? 'text-emerald-600 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20' : deal.is_paid_to_user ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                {deal.is_user_confirmed_payment ? "Pago (Confirmado)" : deal.is_paid_to_user ? "Aguardando SDR" : "Dar Baixa"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-64 p-3 shadow-lg" align="end">
@@ -839,16 +1075,16 @@ function ExpandableCommissionRow({ deal, profile, getUserName, presentations, gl
                 <p className="font-mono font-medium">{formatCurrency(baseMonthlyComm + baseImplComm)} <span className="text-[9px] text-muted-foreground">({tier.label})</span></p>
               </div>
               <div className="space-y-1">
-                <p className="text-emerald-600/80">Super Meta Adicional</p>
+                <p className="text-emerald-600/80">Super Meta</p>
                 <p className="font-mono font-medium text-emerald-600">{superMetaBonus > 0 ? "+" + formatCurrency(superMetaBonus) : "—"}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-muted-foreground">Pagamento Previsto</p>
+                <p className="text-muted-foreground">Dia de Pagamento Previsto</p>
                 <p className="font-medium text-blue-600/80">{expectedPaymentDateStr}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-muted-foreground">Data Realizada</p>
-                <p className="font-medium text-emerald-600/80">{deal.user_payment_date ? format(new Date(deal.user_payment_date + "T12:00:00"), "dd/MM/yyyy") : "—"}</p>
+                <p className="text-muted-foreground">Dia de Pagamento Realizado</p>
+                <p className="font-medium text-emerald-600/80">{(deal.actual_payment_date || deal.user_payment_date) ? format(new Date((deal.actual_payment_date || deal.user_payment_date) + "T12:00:00"), "dd/MM/yyyy") : "A aguardar"}</p>
               </div>
             </div>
           </TableCell>

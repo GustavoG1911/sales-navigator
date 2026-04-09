@@ -21,6 +21,9 @@ interface DbDeal {
   payment_status: string;
   created_at: string;
   updated_at: string;
+  is_user_confirmed_payment?: boolean;
+  is_mensalidade_paid_by_client?: boolean;
+  is_paid_to_user?: boolean;
 }
 
 function dbToDeal(row: DbDeal): Deal {
@@ -38,6 +41,11 @@ function dbToDeal(row: DbDeal): Deal {
     installmentDates: Array.isArray(row.installment_dates) ? row.installment_dates : [],
     paymentStatus: row.payment_status as Deal["paymentStatus"],
     userId: (row as any).user_id,
+    commissionAmountSnapshot: row.commission_amount_snapshot,
+    commissionRateSnapshot: row.commission_rate_snapshot,
+    isUserConfirmedPayment: row.is_user_confirmed_payment,
+    isMensalidadePaidByClient: row.is_mensalidade_paid_by_client,
+    isPaidToUser: row.is_paid_to_user,
   };
 }
 
@@ -55,6 +63,9 @@ function dealToDb(deal: Deal) {
     installment_dates: deal.installmentDates,
     payment_status: deal.paymentStatus,
     user_id: deal.userId,
+    commission_amount_snapshot: deal.commissionAmountSnapshot,
+    commission_rate_snapshot: deal.commissionRateSnapshot,
+    is_user_confirmed_payment: deal.isUserConfirmedPayment,
   };
 }
 
@@ -85,9 +96,29 @@ export async function upsertDeal(deal: Deal): Promise<Deal> {
     if (error) throw error;
     return dbToDeal(data as any);
   } else {
+    // Generate snapshot on creation
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("commission_percent")
+      .eq("user_id", userId)
+      .single();
+      
+    const snapshotRate = (profile?.commission_percent || 20) / 100;
+    const mv = deal.monthlyValue || 0;
+    const iv = deal.implantationValue || 0;
+    const snapshotAmount = (mv * snapshotRate) + (iv * 0.4 * snapshotRate);
+
+    const insertPayload = { 
+      ...payload, 
+      user_id: userId,
+      commission_rate_snapshot: snapshotRate,
+      commission_amount_snapshot: snapshotAmount,
+      is_user_confirmed_payment: false
+    };
+
     const { data, error } = await supabase
       .from("deals" as any)
-      .insert({ ...payload, user_id: userId } as any)
+      .insert(insertPayload as any)
       .select()
       .single();
     if (error) throw error;

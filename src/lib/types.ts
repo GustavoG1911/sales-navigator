@@ -20,6 +20,11 @@ export interface Deal {
   installmentDates: InstallmentDate[];
   paymentStatus: PaymentStatus;
   userId?: string;
+  commissionAmountSnapshot?: number;
+  commissionRateSnapshot?: number;
+  isUserConfirmedPayment?: boolean;
+  isMensalidadePaidByClient?: boolean;
+  isPaidToUser?: boolean;
 }
 
 export interface OperationPresentations {
