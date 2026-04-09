@@ -50,12 +50,6 @@ export default function Index() {
   const [kpiModalType, setKpiModalType] = useState<"projected" | "paid" | "deals" | null>(null);
   const [filtroOperacao, setFiltroOperacao] = useState("Todas");
   const [profiles, setProfiles] = useState<any>({});
-  const [kpiModalTitles] = useState({
-    projected: "Comissão Projetada (Pendente)",
-    paid: "Comissão Destravada (Paga)",
-    deals: "Fechamentos",
-    volume: "Volume Total"
-  });
 
   const periodSuffix = periodType === "month" ? "do Mês" : periodType === "quarter" ? "do Trimestre" : periodType === "year" ? "do Ano" : "do Período";
 
