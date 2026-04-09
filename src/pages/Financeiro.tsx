@@ -429,6 +429,8 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
 }
 
 function FinanceiroContent() {
+  const queryClient = useQueryClient();
+  const { role, user } = useAuth();
   const currentMonthKey = getMonthKey(new Date());
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [filtroOperacao, setFiltroOperacao] = useState("Todas");
@@ -441,10 +443,6 @@ function FinanceiroContent() {
   const [kpiModalType, setKpiModalType] = useState<"volume" | "pago" | "projetado" | "fixo" | null>(null);
   
   const monthOptions = useMemo(() => buildMonthOptions(), []);
-
-  const queryClient = useQueryClient();
-  const { role, user } = useAuth();
-  const { presentations } = useAppData(role, user?.id);
 
   const { data, isLoading: loading } = useQuery({
     queryKey: ["finance-data", role, user?.id, filterType, selectedYear],
