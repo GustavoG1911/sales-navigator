@@ -29,19 +29,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchRole = async (userId: string) => {
     try {
-      console.log("[useAuth] Chamada fetchRole para:", userId);
       const { data, error } = await supabase
         .from("profiles")
         .select("role")
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (error) {
-        if (!error.message?.includes("querying schema")) {
-           console.error("[useAuth] Erro no fetchRole:", error.message);
-        }
-        setRole("user");
-      } else if (data) {
+      if (!error && data) {
         const dbRole = data.role as any;
         if (dbRole === "admin") setRole("admin");
         else if (dbRole === "gestor") setRole("gestor");
@@ -50,10 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole("user");
       }
     } catch (err) {
-      console.error("[useAuth] Crash no fetchRole:", err);
       setRole("user");
     } finally {
-      console.log("[useAuth] Finalizado carregamento de papel.");
       setLoading(false);
     }
   };
