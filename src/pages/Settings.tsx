@@ -19,7 +19,7 @@ import { useAppData } from "@/hooks/useAppData";
 
 export default function Settings() {
   const { role, user, loading: authLoading } = useAuth();
-  const { settings, updateSettings } = useAppData(role, user?.email);
+  const { settings, updateSettings } = useAppData(role, user?.id);
 
   if (authLoading) {
     return (

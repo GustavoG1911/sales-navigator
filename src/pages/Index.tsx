@@ -28,7 +28,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 export default function Index() {
   const queryClient = useQueryClient();
   const { role, user } = useAuth();
-  const { deals = [], loading, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, addOrUpdateDeal, removeDeal } = useAppData(role, user?.email);
+  const { deals = [], loading, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, addOrUpdateDeal, removeDeal } = useAppData(role, user?.id);
 
   // ESTADOS E DATAS (Devem vir antes de qualquer useMemo)
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
