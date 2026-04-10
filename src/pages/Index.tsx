@@ -101,12 +101,20 @@ export default function Index() {
     () => deals.filter((d) => {
       const baseDate = d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
       const { monthKey } = getPaymentDateInfo(baseDate);
-      const passDate = monthKey === selectedMonthKey;
+
+      let passDate: boolean;
+      if (isSingleMonth) {
+        passDate = monthKey === selectedMonthKey;
+      } else {
+        const fromKey = getMonthKey(dateRange.from);
+        const toKey = getMonthKey(dateRange.to);
+        passDate = monthKey >= fromKey && monthKey <= toKey;
+      }
 
       if (isDirector) return passDate;
       return passDate && d.userId === user?.id;
     }),
-    [deals, selectedMonthKey, isDirector, user?.id]
+    [deals, selectedMonthKey, isSingleMonth, dateRange, isDirector, user?.id]
   );
 
   const filteredDeals = closedDeals; // Fallback for table and other uses
@@ -351,13 +359,15 @@ export default function Index() {
             </div>
           </div>
 
-          <div className="my-6">
-             <PresentationsCard
-               presentations={currentMonthPres}
-               onUpdate={(op, count) => updatePresentations(selectedMonthKey, op, count)}
-               settings={settings}
-             />
-          </div>
+          {isSingleMonth && (
+            <div className="my-6">
+              <PresentationsCard
+                presentations={currentMonthPres}
+                onUpdate={(op, count) => updatePresentations(selectedMonthKey, op, count)}
+                settings={settings}
+              />
+            </div>
+          )}
 
           <div>
             <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold flex items-center gap-2">

@@ -460,12 +460,12 @@ function FinanceiroContent() {
       const baseDate = d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
       const dateObj = new Date(baseDate);
       
+      const { monthKey: dealMonthKey } = getPaymentDateInfo(baseDate);
       let passTime = false;
       if (filterType === "month") {
-        const { monthKey } = getPaymentDateInfo(baseDate);
-        passTime = monthKey === selectedMonth;
+        passTime = dealMonthKey === selectedMonth;
       } else {
-        passTime = dateObj.getFullYear().toString() === selectedYear;
+        passTime = dealMonthKey.startsWith(selectedYear);
       }
 
       // Operation
@@ -488,12 +488,12 @@ function FinanceiroContent() {
 
   const filteredSalaries = useMemo(() => {
     return activeSalaries.filter((s) => {
-      const dateObj = new Date(s.reference_month);
+      const salaryMonthKey = getMonthKey(s.reference_month);
       let passTime = false;
       if (filterType === "month") {
-        passTime = getMonthKey(s.reference_month) === selectedMonth;
+        passTime = salaryMonthKey === selectedMonth;
       } else {
-        passTime = dateObj.getFullYear().toString() === selectedYear;
+        passTime = salaryMonthKey.startsWith(selectedYear);
       }
 
       const passUser = filtroFuncionario === "Todos" || s.user_id === filtroFuncionario;
@@ -519,8 +519,8 @@ function FinanceiroContent() {
       
       // If monthly view, must match selectedMonth
       if (filterType === "month" && monthKey !== selectedMonth) return;
-      // If yearly view, must match selectedYear
-      if (filterType === "year" && new Date(baseDate).getFullYear().toString() !== selectedYear) return;
+      // If yearly view, use competência monthKey (respects Regra do Dia 07)
+      if (filterType === "year" && !monthKey.startsWith(selectedYear)) return;
 
       volumeTotal += deal.monthlyValue + deal.implantationValue;
 
