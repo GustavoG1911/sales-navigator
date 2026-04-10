@@ -49,11 +49,15 @@ export type Database = {
       }
       deals: {
         Row: {
+          actual_payment_date: string | null
           client_name: string
           client_payment_date: string | null
           closing_date: string
+          commission_amount_snapshot: number | null
+          commission_rate_snapshot: number | null
           created_at: string
           expected_commission_date: string | null
+          expected_payment_date: string | null
           first_payment_date: string | null
           id: string
           implantacao_payment_date: string | null
@@ -70,6 +74,8 @@ export type Database = {
           is_mensalidade_paid_by_client: boolean | null
           is_paid_by_client: boolean | null
           is_paid_to_user: boolean | null
+          is_test_data: boolean | null
+          is_user_confirmed_payment: boolean | null
           mensalidade_payment_date: string | null
           monthly_value: number
           operation: string
@@ -79,11 +85,15 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          actual_payment_date?: string | null
           client_name: string
           client_payment_date?: string | null
           closing_date?: string
+          commission_amount_snapshot?: number | null
+          commission_rate_snapshot?: number | null
           created_at?: string
           expected_commission_date?: string | null
+          expected_payment_date?: string | null
           first_payment_date?: string | null
           id?: string
           implantacao_payment_date?: string | null
@@ -100,6 +110,8 @@ export type Database = {
           is_mensalidade_paid_by_client?: boolean | null
           is_paid_by_client?: boolean | null
           is_paid_to_user?: boolean | null
+          is_test_data?: boolean | null
+          is_user_confirmed_payment?: boolean | null
           mensalidade_payment_date?: string | null
           monthly_value?: number
           operation?: string
@@ -109,11 +121,15 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          actual_payment_date?: string | null
           client_name?: string
           client_payment_date?: string | null
           closing_date?: string
+          commission_amount_snapshot?: number | null
+          commission_rate_snapshot?: number | null
           created_at?: string
           expected_commission_date?: string | null
+          expected_payment_date?: string | null
           first_payment_date?: string | null
           id?: string
           implantacao_payment_date?: string | null
@@ -130,6 +146,8 @@ export type Database = {
           is_mensalidade_paid_by_client?: boolean | null
           is_paid_by_client?: boolean | null
           is_paid_to_user?: boolean | null
+          is_test_data?: boolean | null
+          is_user_confirmed_payment?: boolean | null
           mensalidade_payment_date?: string | null
           monthly_value?: number
           operation?: string
@@ -265,6 +283,33 @@ export type Database = {
         }
         Relationships: []
       }
+      presentations: {
+        Row: {
+          count: number | null
+          date: string | null
+          id: string
+          is_test_data: boolean | null
+          operation: string
+          user_id: string | null
+        }
+        Insert: {
+          count?: number | null
+          date?: string | null
+          id?: string
+          is_test_data?: boolean | null
+          operation: string
+          user_id?: string | null
+        }
+        Update: {
+          count?: number | null
+          date?: string | null
+          id?: string
+          is_test_data?: boolean | null
+          operation?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -275,6 +320,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_sandbox: boolean | null
+          is_test_data: boolean | null
           job_title: string | null
           position: string | null
           role: string | null
@@ -290,6 +336,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_sandbox?: boolean | null
+          is_test_data?: boolean | null
           job_title?: string | null
           position?: string | null
           role?: string | null
@@ -305,6 +352,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_sandbox?: boolean | null
+          is_test_data?: boolean | null
           job_title?: string | null
           position?: string | null
           role?: string | null
@@ -358,6 +406,7 @@ export type Database = {
         Args: { payment_date: string }
         Returns: string
       }
+      get_user_role: { Args: { user_id_param: string }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_gestor: { Args: { _user_id: string }; Returns: boolean }
     }

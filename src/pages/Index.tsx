@@ -149,7 +149,7 @@ export default function Index() {
     return data;
   }, [dateRange, closedDeals, presentations]);
 
-  const volumeChartData = useMemo(() => {
+  const volumeChartData = useMemo((): any[] => {
     if (isSingleMonth && chartTimeline.length > 0) {
       const d = chartTimeline[0];
       return [
@@ -164,7 +164,7 @@ export default function Index() {
     }));
   }, [isSingleMonth, chartTimeline]);
 
-  const presChartData = useMemo(() => {
+  const presChartData = useMemo((): any[] => {
     if (isSingleMonth && chartTimeline.length > 0) {
       const d = chartTimeline[0];
       return [

@@ -10,23 +10,26 @@ import { toast } from "sonner";
 
 interface SettingsPanelProps {
   settings: AppSettings;
-  onSave: (s: AppSettings) => void;
+  onSave?: (s: AppSettings) => void;
+  onUpdate?: (s: AppSettings) => void;
   onRefreshDeals?: () => void;
 }
 
-export function SettingsPanel({ settings, onSave, onRefreshDeals }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onSave, onUpdate, onRefreshDeals }: SettingsPanelProps) {
   const [salary, setSalary] = useState(settings.fixedSalary.toString());
   const [commissionRate, setCommissionRate] = useState(((settings.commissionRate || 0.20) * 100).toString());
   const [superMetaThreshold, setSuperMetaThreshold] = useState((settings.superMetaThreshold || 30).toString());
   const [superMetaMultiplier, setSuperMetaMultiplier] = useState(((settings.superMetaMultiplier || 2) * 100).toString());
 
   const handleSave = () => {
-    onSave({
+    const newSettings = {
       fixedSalary: parseFloat(salary) || 0,
       commissionRate: (parseFloat(commissionRate) || 20) / 100,
       superMetaThreshold: parseInt(superMetaThreshold) || 30,
       superMetaMultiplier: (parseFloat(superMetaMultiplier) || 200) / 100,
-    });
+    };
+    onSave?.(newSettings);
+    onUpdate?.(newSettings);
     toast.success("Parâmetros salvos com sucesso!");
   };
 
