@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { DealFormDialog } from "@/components/DealFormDialog";
-import { SettingsPanel } from "@/components/SettingsPanel";
+
 import { PeriodFilter, DateRange, PeriodType } from "@/components/PeriodFilter";
 import { calculateCommission, formatCurrency, getMonthKey, formatMonthLabel, getPresentationsForDeal, getPaymentDateInfo } from "@/lib/commission";
 import { downloadReportPDF, printReport } from "@/lib/report";
@@ -354,17 +354,12 @@ export default function Index() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 my-6">
-             <div className="lg:col-span-2">
-                 <PresentationsCard
-                   presentations={currentMonthPres}
-                   onUpdate={(op, count) => updatePresentations(selectedMonthKey, op, count)}
-                   settings={settings}
-                 />
-             </div>
-             <div>
-                 <SettingsPanel settings={settings} onUpdate={updateSettings} />
-             </div>
+          <div className="my-6">
+             <PresentationsCard
+               presentations={currentMonthPres}
+               onUpdate={(op, count) => updatePresentations(selectedMonthKey, op, count)}
+               settings={settings}
+             />
           </div>
 
           <div>
