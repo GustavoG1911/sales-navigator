@@ -242,3 +242,21 @@ export async function savePresentationToDb(monthKey: string, operation: "bluepex
   const { error } = await (supabase as any).from("presentations").upsert(payload);
   if (error) throw error;
 }
+
+export async function fetchUserCommissionRate(userId: string): Promise<number | null> {
+  const { data, error } = await (supabase as any)
+    .from("profiles")
+    .select("commission_percent")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error || !data || data.commission_percent == null) return null;
+  return data.commission_percent / 100;
+}
+
+export async function saveUserCommissionRate(userId: string, rate: number): Promise<void> {
+  const { error } = await (supabase as any)
+    .from("profiles")
+    .update({ commission_percent: Math.round(rate * 100) })
+    .eq("user_id", userId);
+  if (error) throw error;
+}

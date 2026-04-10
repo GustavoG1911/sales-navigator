@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings, ReceivableAdjustments, ReceivableAdjustment } from "@/lib/types";
 import { getPresentations, savePresentations, getSettings, saveSettings, getSuperMeta, saveSuperMeta, getAdjustments, saveAdjustments } from "@/lib/store";
-import { fetchDeals, upsertDeal, deleteDealFromDb, fetchPresentations, savePresentationToDb } from "@/lib/supabase-deals";
+import { fetchDeals, upsertDeal, deleteDealFromDb, fetchPresentations, savePresentationToDb, fetchUserCommissionRate, saveUserCommissionRate } from "@/lib/supabase-deals";
 import { toast } from "sonner";
 import { UserRole } from "./useAuth";
 
@@ -16,19 +16,23 @@ export function useAppData(role: UserRole = "user", userId?: string, position?: 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [dealsData, presData] = await Promise.all([
+      const [dealsData, presData, commRate] = await Promise.all([
         fetchDeals(role, userId, position),
-        fetchPresentations(role, userId, position)
+        fetchPresentations(role, userId, position),
+        userId ? fetchUserCommissionRate(userId) : Promise.resolve(null),
       ]);
       setDeals(dealsData);
       setPresentations(presData);
+      if (commRate !== null) {
+        setSettings((prev) => ({ ...prev, commissionRate: commRate }));
+      }
     } catch (err: any) {
       console.error("Error fetching data:", err);
       toast.error("Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
-  }, [role, userId]);
+  }, [role, userId, position]);
 
   const loadDeals = loadData; // Alias for compatibility
 
@@ -71,10 +75,17 @@ export function useAppData(role: UserRole = "user", userId?: string, position?: 
     }
   }, [role, userId]);
 
-  const updateSettings = useCallback((newSettings: AppSettings) => {
+  const updateSettings = useCallback(async (newSettings: AppSettings) => {
     saveSettings(newSettings);
     setSettings(newSettings);
-  }, []);
+    if (userId) {
+      try {
+        await saveUserCommissionRate(userId, newSettings.commissionRate);
+      } catch (err: any) {
+        console.error("Error saving commission rate to DB:", err);
+      }
+    }
+  }, [userId]);
 
   const toggleSuperMeta = useCallback((monthKey: string, active: boolean) => {
     const updated = { ...superMeta, [monthKey]: active };

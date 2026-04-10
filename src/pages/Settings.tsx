@@ -12,14 +12,28 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Users, Save, Shield, UserCog, User, Loader2, SlidersHorizontal } from "lucide-react";
+import { Users, Save, Shield, UserCog, User, Loader2, SlidersHorizontal, FlaskConical } from "lucide-react";
 import { toast } from "sonner";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { useAppData } from "@/hooks/useAppData";
+import { seedHistoricalData } from "@/lib/seed-test-data";
 
 export default function Settings() {
   const { role, user, loading: authLoading, position } = useAuth();
   const { settings, updateSettings } = useAppData(role, user?.id, position);
+  const [seeding, setSeeding] = useState(false);
+
+  const handleSeed = async () => {
+    setSeeding(true);
+    try {
+      await seedHistoricalData();
+      toast.success("Banco de teste populado com sucesso!");
+    } catch (err: any) {
+      toast.error("Erro ao popular banco: " + err.message);
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   if (authLoading) {
     return (
@@ -62,6 +76,24 @@ export default function Settings() {
           </TabsContent>
         )}
       </Tabs>
+
+      {position === "Diretor" && (
+        <div className="mt-8 pt-6 border-t border-border/40">
+          <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide font-medium">Ambiente de Teste</p>
+          <Button
+            variant="destructive"
+            onClick={handleSeed}
+            disabled={seeding}
+            className="gap-2"
+          >
+            {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
+            {seeding ? "Populando banco..." : "POPULAR BANCO (TESTE)"}
+          </Button>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Limpa e reinserere dados de teste realistas (deals + apresentações). Não afeta perfis.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
