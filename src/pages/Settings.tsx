@@ -18,7 +18,8 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { useAppData } from "@/hooks/useAppData";
 
 export default function Settings() {
-  const { role, loading: authLoading } = useAuth();
+  const { role, user, loading: authLoading } = useAuth();
+  const { settings, updateSettings } = useAppData(role, user?.email);
 
   if (authLoading) {
     return (
@@ -37,6 +38,10 @@ export default function Settings() {
             <User className="h-3.5 w-3.5" />
             Meu Perfil
           </TabsTrigger>
+          <TabsTrigger value="comissions" className="text-xs gap-1.5">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Metas e Comissões
+          </TabsTrigger>
           {role === "admin" && (
             <TabsTrigger value="team" className="flex items-center gap-2">
               <Users className="h-3.5 w-3.5" />
@@ -47,6 +52,9 @@ export default function Settings() {
 
         <TabsContent value="profile">
           <ProfileTab />
+        </TabsContent>
+        <TabsContent value="comissions">
+          <SettingsPanel settings={settings} onUpdate={updateSettings} />
         </TabsContent>
         {role === "admin" && (
           <TabsContent value="team">
