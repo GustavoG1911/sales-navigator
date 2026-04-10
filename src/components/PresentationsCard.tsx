@@ -1,7 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { OperationPresentations, AppSettings } from "@/lib/types";
 import { getCommissionTier } from "@/lib/commission";
 import { Plus, Minus, HelpCircle } from "lucide-react";
@@ -29,6 +27,43 @@ function StatusBadge({ presentations, meta, superMeta }: { presentations: number
   );
 }
 
+function CounterInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (val: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+        onClick={() => onChange(Math.max(0, value - 1))}
+      >
+        <Minus className="h-3 w-3" />
+      </button>
+      <input
+        type="number"
+        min={0}
+        value={value}
+        onChange={(e) => {
+          const parsed = parseInt(e.target.value, 10);
+          onChange(Number.isNaN(parsed) ? 0 : Math.max(0, parsed));
+        }}
+        className="flex h-8 w-14 rounded-md bg-muted/40 px-1 text-center text-lg font-bold border-0 outline-none focus-visible:ring-2 focus-visible:ring-ring [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+      />
+      <button
+        type="button"
+        className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+        onClick={() => onChange(value + 1)}
+      >
+        <Plus className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
 export function PresentationsCard({ presentations, onUpdate, settings }: PresentationsCardProps) {
   const meta = 15;
   const superMeta = settings?.superMetaThreshold ?? 30;
@@ -49,7 +84,9 @@ export function PresentationsCard({ presentations, onUpdate, settings }: Present
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <HelpCircle className="h-[14px] w-[14px] text-muted-foreground/60 cursor-help" />
+                <span className="cursor-help">
+                  <HelpCircle className="h-[14px] w-[14px] text-muted-foreground/60" />
+                </span>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[250px] text-xs">
                 Regras de conversão: alcance a meta estipulada para ativar aceleradores de comissão.
@@ -65,31 +102,10 @@ export function PresentationsCard({ presentations, onUpdate, settings }: Present
               <StatusBadge presentations={bluepexCount} meta={meta} superMeta={superMeta} />
             </div>
             
-            <div className="flex items-center gap-1">
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => onUpdate("bluepex", Math.max(0, bluepexCount - 1))}
-              >
-                <Minus className="h-3 w-3" />
-              </Button>
-              <Input
-                type="number"
-                min={0}
-                value={bluepexCount}
-                onChange={(e) => onUpdate("bluepex", parseInt(e.target.value) || 0)}
-                className="text-lg font-bold text-center h-8 border-0 bg-muted/40 px-1 w-14 hide-arrows"
-              />
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => onUpdate("bluepex", bluepexCount + 1)}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
+            <CounterInput
+              value={bluepexCount}
+              onChange={(val) => onUpdate("bluepex", val)}
+            />
 
             <div className="flex items-center gap-1.5">
               <div className={`h-1.5 w-1.5 rounded-full ${bpTier.rate >= 1.0 ? "bg-success" : "bg-warning"}`} />
@@ -110,31 +126,10 @@ export function PresentationsCard({ presentations, onUpdate, settings }: Present
               <StatusBadge presentations={opusCount} meta={meta} superMeta={superMeta} />
             </div>
 
-            <div className="flex items-center gap-1">
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => onUpdate("opus", Math.max(0, opusCount - 1))}
-              >
-                <Minus className="h-3 w-3" />
-              </Button>
-              <Input
-                type="number"
-                min={0}
-                value={opusCount}
-                onChange={(e) => onUpdate("opus", parseInt(e.target.value) || 0)}
-                className="text-lg font-bold text-center h-8 border-0 bg-muted/40 px-1 w-14 hide-arrows"
-              />
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => onUpdate("opus", opusCount + 1)}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
+            <CounterInput
+              value={opusCount}
+              onChange={(val) => onUpdate("opus", val)}
+            />
 
             <div className="flex items-center gap-1.5">
               <div className={`h-1.5 w-1.5 rounded-full ${opTier.rate >= 1.0 ? "bg-success" : "bg-warning"}`} />
