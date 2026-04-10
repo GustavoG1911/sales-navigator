@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { OperationPresentations, AppSettings } from "@/lib/types";
@@ -46,7 +47,7 @@ function CounterInput({
       <input
         type="number"
         min={0}
-        value={value}
+        value={value || 0}
         onChange={(e) => {
           const parsed = parseInt(e.target.value, 10);
           onChange(Number.isNaN(parsed) ? 0 : Math.max(0, parsed));
@@ -68,8 +69,24 @@ export function PresentationsCard({ presentations, onUpdate, settings }: Present
   const meta = 15;
   const superMeta = settings?.superMetaThreshold ?? 30;
 
-  const bluepexCount = presentations?.bluepex ?? 0;
-  const opusCount = presentations?.opus ?? 0;
+  // Local state for immediate UI feedback — props sync back after async save
+  const [bluepexCount, setBluepexCount] = useState(presentations?.bluepex ?? 0);
+  const [opusCount, setOpusCount] = useState(presentations?.opus ?? 0);
+
+  useEffect(() => {
+    setBluepexCount(presentations?.bluepex ?? 0);
+    setOpusCount(presentations?.opus ?? 0);
+  }, [presentations?.bluepex, presentations?.opus]);
+
+  const handleBluepexChange = (val: number) => {
+    setBluepexCount(val);
+    onUpdate("bluepex", val);
+  };
+
+  const handleOpusChange = (val: number) => {
+    setOpusCount(val);
+    onUpdate("opus", val);
+  };
 
   const bpTier = getCommissionTier(bluepexCount, meta, superMeta);
   const opTier = getCommissionTier(opusCount, meta, superMeta);
@@ -104,7 +121,7 @@ export function PresentationsCard({ presentations, onUpdate, settings }: Present
             
             <CounterInput
               value={bluepexCount}
-              onChange={(val) => onUpdate("bluepex", val)}
+              onChange={handleBluepexChange}
             />
 
             <div className="flex items-center gap-1.5">
@@ -128,7 +145,7 @@ export function PresentationsCard({ presentations, onUpdate, settings }: Present
 
             <CounterInput
               value={opusCount}
-              onChange={(val) => onUpdate("opus", val)}
+              onChange={handleOpusChange}
             />
 
             <div className="flex items-center gap-1.5">
