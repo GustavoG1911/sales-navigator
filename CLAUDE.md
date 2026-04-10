@@ -35,6 +35,22 @@ Supabase (snake_case)
 
 ---
 
+## Modelo de Permissões e Cargos
+
+**IMPORTANTE:** `role` e `position` são conceitos separados. Nunca usar `role` para decisões de visibilidade de dados ou UI.
+
+| Campo | Tabela | Valores | Controla |
+|---|---|---|---|
+| `role` | `profiles` | `admin`, `gestor`, `user` | Permissões de sistema (aprovar usuários, mudar configs globais) |
+| `position` | `profiles` | `Diretor`, `Executivo de Negócios`, `SDR` | Visibilidade de dados, UI, cálculo de comissão |
+
+### Regras de Visibilidade por Position
+- **Diretor** → vê todos os deals (sem filtro de `user_id`), painel consolidado, filtros avançados
+- **Executivo de Negócios** → vê apenas os próprios deals
+- **SDR** → vê deals de todos os Executivos de Negócios (busca por `position = "Executivo de Negócios"` na tabela `profiles`)
+
+---
+
 ## Regras de Negócio Inegociáveis
 
 ### Regra do Dia 07 (Transbordo)
@@ -58,6 +74,8 @@ Usuários com email `@teste.com` operam em banco isolado (`is_test_data: true`).
 4. **NÃO** alterar nomes de colunas no banco sem atualizar o mapeador `dbToDeal` e `dealToDb`.
 5. **NÃO** refatorar lógicas que já estão operacionais. Ser cirúrgico.
 6. **NÃO** colocar `useMemo` antes de `useState` em `Index.tsx` (causa Temporal Dead Zone).
+7. **NÃO** usar `role` para decisões de visibilidade de dados ou UI. Usar sempre `position`.
+8. **NÃO** gravar `role` a partir do cargo do usuário. O `OnboardingModal` salva cargo em `position`, nunca em `role`.
 
 ---
 
@@ -87,6 +105,11 @@ Usuários com email `@teste.com` operam em banco isolado (`is_test_data: true`).
 **Arquivo:** `src/components/PresentationsCard.tsx`
 **Problema:** `button cannot appear as a descendant of button` no PresentationsCard.
 **Fix aplicado:** `TooltipTrigger` usa `asChild` com `<span>`, evitando que o Radix renderize um `<button>` extra. Os botões do `CounterInput` ficam dentro de `<div>`, sem nesting inválido.
+
+### ✅ RESOLVIDO — Separação de cargo (position) e permissão (role)
+**Arquivos:** `OnboardingModal.tsx`, `useAuth.tsx`, `supabase-deals.ts`, `useAppData.ts`, `Index.tsx`, `Financeiro.tsx`, `DealsTable.tsx`
+**Problema:** O sistema usava `role` para controlar visibilidade de dados e UI. `OnboardingModal` sobrescrevia o `role` do usuário ao salvar o cargo.
+**Fix aplicado:** `position` exposto pelo `useAuth`, filtros de banco e UI migrados para `position`, `OnboardingModal` para de tocar em `role`.
 
 ---
 

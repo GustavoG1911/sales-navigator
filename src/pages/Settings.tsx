@@ -18,8 +18,8 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { useAppData } from "@/hooks/useAppData";
 
 export default function Settings() {
-  const { role, user, loading: authLoading } = useAuth();
-  const { settings, updateSettings } = useAppData(role, user?.id);
+  const { role, user, loading: authLoading, position } = useAuth();
+  const { settings, updateSettings } = useAppData(role, user?.id, position);
 
   if (authLoading) {
     return (

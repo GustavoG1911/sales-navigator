@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { Deal } from "@/lib/types";
 
-function FutureProjectionsAccumulatedCard({ projections, role, onSelectMonth }: { projections: any[], role: "user" | "gestor", onSelectMonth: (m: string) => void }) {
+function FutureProjectionsAccumulatedCard({ projections, position, onSelectMonth }: { projections: any[], position: string, onSelectMonth: (m: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   
   const totalIn = projections.reduce((acc, p) => acc + (p.projectedIn || 0), 0);
@@ -43,7 +43,7 @@ function FutureProjectionsAccumulatedCard({ projections, role, onSelectMonth }: 
           </div>
         </div>
         <div className="flex items-center gap-4">
-          {role === "user" ? (
+          {position !== "Diretor" ? (
              <span className="font-mono text-emerald-600 font-bold">{formatCurrency(totalIn)}</span>
           ) : (
              <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-end md:items-center">
@@ -64,7 +64,7 @@ function FutureProjectionsAccumulatedCard({ projections, role, onSelectMonth }: 
                {projections.map(proj => (
                  <div key={proj.monthKey} onClick={(e) => { e.stopPropagation(); onSelectMonth(proj.monthKey); }} className="p-3 bg-background rounded-md border border-border/50 cursor-pointer hover:border-primary hover:shadow-sm transition-all">
                    <p className="font-semibold uppercase tracking-widest text-[10px] mb-1.5 text-muted-foreground">{formatMonthLabel(proj.monthKey)}</p>
-                   {role === "user" ? (
+                   {position !== "Diretor" ? (
                      <p className="font-mono text-emerald-600 font-bold text-xs">{formatCurrency(proj.projectedIn)}</p>
                    ) : (
                      <div className="flex flex-col gap-1">
@@ -111,7 +111,7 @@ function buildMonthOptions(): { value: string; label: string }[] {
 }
 
 export default function Financeiro() {
-  const { role, user, loading: authLoading } = useAuth();
+  const { role, user, position, loading: authLoading } = useAuth();
 
   if (authLoading) {
     return (
@@ -121,7 +121,7 @@ export default function Financeiro() {
     );
   }
 
-  if (role === "user" && user) {
+  if (position !== "Diretor" && user) {
     return <UserFinanceiroContent userId={user.id} />;
   }
 
@@ -129,8 +129,8 @@ export default function Financeiro() {
 }
 
 function UserFinanceiroContent({ userId }: { userId: string }) {
-  const { role, user } = useAuth();
-  const { deals = [], settings, presentations, loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal } = useAppData(role, user?.id);
+  const { role, user, position } = useAuth();
+  const { deals = [], settings, presentations, loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal } = useAppData(role, user?.id, position);
   const queryClient = useQueryClient();
   const currentMonthKey = getMonthKey(new Date());
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
@@ -272,7 +272,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
         <KpiCard title="Salário Fixo" value={formatCurrency(kpis.fixed)} icon={DollarSign} variant="primary" />
       </div>
 
-      <FutureProjectionsAccumulatedCard projections={futureProjections} role="user" onSelectMonth={setSelectedMonth} />
+      <FutureProjectionsAccumulatedCard projections={futureProjections} position={position} onSelectMonth={setSelectedMonth} />
 
       <div className="space-y-5">
         <Card>
@@ -399,8 +399,8 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
 
 function FinanceiroContent() {
   const queryClient = useQueryClient();
-  const { role, user } = useAuth();
-  const { deals = [], settings, presentations, loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal } = useAppData(role, user?.id);
+  const { role, user, position } = useAuth();
+  const { deals = [], settings, presentations, loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal } = useAppData(role, user?.id, position);
 
   const currentMonthKey = getMonthKey(new Date());
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
@@ -785,7 +785,7 @@ function FinanceiroContent() {
         </Card>
       </div>
 
-      <FutureProjectionsAccumulatedCard projections={futureProjections} role="gestor" onSelectMonth={setSelectedMonth} />
+      <FutureProjectionsAccumulatedCard projections={futureProjections} position={position} onSelectMonth={setSelectedMonth} />
 
       <Tabs defaultValue="receivables">
         <TabsList className="h-9 mb-5">

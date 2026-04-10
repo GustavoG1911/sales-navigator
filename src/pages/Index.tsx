@@ -27,8 +27,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 
 export default function Index() {
   const queryClient = useQueryClient();
-  const { role, user } = useAuth();
-  const { deals = [], loading, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, addOrUpdateDeal, removeDeal } = useAppData(role, user?.id);
+  const { role, user, position } = useAuth();
+  const { deals = [], loading, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, addOrUpdateDeal, removeDeal } = useAppData(role, user?.id, position);
 
   // ESTADOS E DATAS (Devem vir antes de qualquer useMemo)
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
@@ -65,7 +65,7 @@ export default function Index() {
   };
 
   useEffect(() => {
-    if (role === "admin" || role === "gestor") {
+    if (position === "Diretor") {
       supabase.from("profiles").select("user_id, full_name").then(({ data }) => {
         if (data) {
           const map: any = {};
@@ -74,7 +74,7 @@ export default function Index() {
         }
       });
     }
-  }, [role]);
+  }, [position]);
 
   useEffect(() => {
     fetchAvailableYears(user?.email || "").then(setAvailableYears);
@@ -86,14 +86,14 @@ export default function Index() {
       const date = new Date(d.closingDate);
       const passDate = date >= dateRange.from && date <= dateRange.to;
 
-      if (role === "admin" || role === "gestor") {
+      if (position === "Diretor") {
         const passOp = filtroOperacao === "Todas" || d.operation === filtroOperacao;
         const passUser = filtroFuncionario === "Todos" || d.userId === filtroFuncionario;
         return passDate && passOp && passUser;
       }
-      return passDate && (!user || d.userId === user.id || !d.userId); 
+      return passDate;
     }),
-    [deals, dateRange, filtroOperacao, filtroFuncionario, role, user]
+    [deals, dateRange, filtroOperacao, filtroFuncionario, position]
   );
 
   const financialDeals = useMemo(
@@ -102,14 +102,14 @@ export default function Index() {
       const { monthKey } = getPaymentDateInfo(baseDate);
       const passDate = monthKey === selectedMonthKey;
 
-      if (role === "admin" || role === "gestor") {
+      if (position === "Diretor") {
         const passOp = filtroOperacao === "Todas" || d.operation === filtroOperacao;
         const passUser = filtroFuncionario === "Todos" || d.userId === filtroFuncionario;
         return passDate && passOp && passUser;
       }
-      return passDate && (!user || d.userId === user.id || !d.userId); 
+      return passDate;
     }),
-    [deals, selectedMonthKey, filtroOperacao, filtroFuncionario, role, user]
+    [deals, selectedMonthKey, filtroOperacao, filtroFuncionario, position]
   );
 
   const filteredDeals = closedDeals; // Fallback for table and other uses
@@ -286,7 +286,7 @@ export default function Index() {
       <div className="mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex flex-col gap-4 w-full md:w-auto">
           
-          {(role === "admin" || role === "gestor") && (
+          {position === "Diretor" && (
             <Card className="bg-muted/30">
               <CardContent className="p-4 flex flex-wrap items-center gap-4">
                 <PeriodFilter onPeriodChange={handlePeriodChange} availableYears={availableYears} />
@@ -316,7 +316,7 @@ export default function Index() {
             </Card>
           )}
 
-          {role === "user" && (
+          {position !== "Diretor" && (
             <div className="flex items-center">
               <PeriodFilter onPeriodChange={handlePeriodChange} />
             </div>

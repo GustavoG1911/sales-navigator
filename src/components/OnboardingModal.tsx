@@ -10,9 +10,9 @@ import { toast } from "sonner";
 import { Save, User } from "lucide-react";
 
 const CARGO_OPTIONS = [
-  { value: "diretor", label: "Diretor", role: "admin" },
-  { value: "executivo", label: "Executivo de Negócios", role: "user" },
-  { value: "sdr", label: "SDR", role: "user" },
+  { value: "Diretor", label: "Diretor" },
+  { value: "Executivo de Negócios", label: "Executivo de Negócios" },
+  { value: "SDR", label: "SDR" },
 ] as const;
 
 interface ProfileData {
@@ -55,7 +55,7 @@ export function OnboardingModal({ forceOpen, onClose }: OnboardingModalProps) {
   const checkProfile = async () => {
     const { data, error } = await supabase
       .from("profiles")
-      .select("full_name, role, job_title, fixed_salary, commission_percent")
+      .select("full_name, position, job_title, fixed_salary, commission_percent")
       .eq("user_id", user!.id)
       .maybeSingle();
 
@@ -64,16 +64,13 @@ export function OnboardingModal({ forceOpen, onClose }: OnboardingModalProps) {
     }
 
     if (data) {
-      // Mapear role do DB de volta para cargo do dropdown
-      const cargoFromRole = data.role === "admin" ? "diretor" : 
-        (data.job_title?.toLowerCase()?.includes("sdr") ? "sdr" : "executivo");
       setForm({
         full_name: data.full_name || "",
-        cargo: cargoFromRole || "",
+        cargo: data.position || "",
         fixed_salary: data.fixed_salary || 0,
         commission_percent: data.commission_percent || 20,
       });
-      if (!data.full_name || !data.role) {
+      if (!data.full_name || !data.position) {
         setIsForced(true);
         setOpen(true);
       }
@@ -87,16 +84,14 @@ export function OnboardingModal({ forceOpen, onClose }: OnboardingModalProps) {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("full_name, role, job_title, fixed_salary, commission_percent")
+      .select("full_name, position, job_title, fixed_salary, commission_percent")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (data) {
-      const cargoFromRole = data.role === "admin" ? "diretor" : 
-        (data.job_title?.toLowerCase()?.includes("sdr") ? "sdr" : "executivo");
       setForm({
         full_name: data.full_name || "",
-        cargo: cargoFromRole || "",
+        cargo: data.position || "",
         fixed_salary: data.fixed_salary || 0,
         commission_percent: data.commission_percent || 20,
       });
@@ -110,14 +105,13 @@ export function OnboardingModal({ forceOpen, onClose }: OnboardingModalProps) {
       return;
     }
     const selectedCargo = CARGO_OPTIONS.find(c => c.value === form.cargo);
-    const dbRole = selectedCargo?.role || "user";
     const jobTitle = selectedCargo?.label || form.cargo;
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
       .update({
         full_name: form.full_name.trim(),
-        role: dbRole,
+        position: form.cargo,
         job_title: jobTitle,
         fixed_salary: form.fixed_salary,
         commission_percent: form.commission_percent,

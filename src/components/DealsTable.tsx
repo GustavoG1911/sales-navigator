@@ -53,8 +53,8 @@ function CommissionDetail({ deal, comm }: { deal: Deal; comm: ReturnType<typeof 
 
 export function DealsTable({ deals, presentations, settings, superMetaActive, onEdit, onDelete, onStatusChange }: DealsTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const { role } = useAuth();
-  const isAdminOrGestor = role === "admin" || role === "gestor";
+  const { position } = useAuth();
+  const isDirector = position === "Diretor";
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -83,7 +83,7 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                 <TableHead className="px-3 py-2.5 text-xs text-right w-[100px]">Mensalidade</TableHead>
                 <TableHead className="px-3 py-2.5 text-xs text-right w-[100px]">Implantação</TableHead>
                 <TableHead className="px-3 py-2.5 text-xs text-right w-[110px]">Comissão</TableHead>
-                {isAdminOrGestor ? (
+                {isDirector ? (
                   <>
                     <TableHead className="px-3 py-2.5 text-xs text-right w-[110px]">Status Cliente</TableHead>
                     <TableHead className="px-3 py-2.5 text-xs text-right w-[110px]">Status Comissão</TableHead>
@@ -133,7 +133,7 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                           <span className="block text-[10px] text-warning font-medium">+{formatCurrency(comm.superMetaBonus)} super</span>
                         )}
                       </TableCell>
-                      {isAdminOrGestor ? (
+                      {isDirector ? (
                         <>
                           <TableCell className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                             <Select

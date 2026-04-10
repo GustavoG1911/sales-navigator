@@ -5,7 +5,7 @@ import { fetchDeals, upsertDeal, deleteDealFromDb, fetchPresentations, savePrese
 import { toast } from "sonner";
 import { UserRole } from "./useAuth";
 
-export function useAppData(role: UserRole = "user", userId?: string) {
+export function useAppData(role: UserRole = "user", userId?: string, position?: string) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [presentations, setPresentations] = useState<MonthlyPresentations>({});
@@ -17,8 +17,8 @@ export function useAppData(role: UserRole = "user", userId?: string) {
     try {
       setLoading(true);
       const [dealsData, presData] = await Promise.all([
-        fetchDeals(role, userId),
-        fetchPresentations(role, userId)
+        fetchDeals(role, userId, position),
+        fetchPresentations(role, userId, position)
       ]);
       setDeals(dealsData);
       setPresentations(presData);
@@ -63,7 +63,7 @@ export function useAppData(role: UserRole = "user", userId?: string) {
     }
     try {
       await savePresentationToDb(monthKey, operation, count, userId);
-      const updatedData = await fetchPresentations(role, userId);
+      const updatedData = await fetchPresentations(role, userId, position);
       setPresentations(updatedData);
     } catch (err: any) {
       console.error("Error saving presentations:", err);

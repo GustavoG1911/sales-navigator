@@ -50,19 +50,38 @@ const dealToDb = (deal: Partial<Deal>) => ({
   is_test_data: deal.isTestData,
 });
 
-export async function fetchDeals(role: UserRole, userId?: string): Promise<Deal[]> {
+export async function fetchDeals(role: UserRole, userId?: string, position?: string): Promise<Deal[]> {
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
-  
-  console.log(`[fetchDeals] Buscando dados para ambiente: ${isTestEnv ? "TESTE 🧪" : "PRODUÇÃO 🚀"} (User: ${user?.email}, Role: ${role})`);
+
+  console.log(`[fetchDeals] Buscando dados para ambiente: ${isTestEnv ? "TESTE 🧪" : "PRODUÇÃO 🚀"} (User: ${user?.email}, Role: ${role}, Position: ${position})`);
+
+  // Pré-buscar UUIDs de executivos se o usuário for SDR
+  let executivoIds: string[] = [];
+  if (position === "SDR") {
+    const { data: executivos } = await (supabase as any)
+      .from("profiles")
+      .select("user_id")
+      .eq("position", "Executivo de Negócios")
+      .eq("is_test_data", isTestEnv);
+    executivoIds = (executivos || []).map((p: any) => p.user_id);
+  }
 
   let query = (supabase as any)
     .from("deals")
     .select("*")
     .eq("is_test_data", isTestEnv);
 
-  // Filtro de segurança: Se não for admin, vê apenas o dele
-  if (role !== "admin") {
+  // Filtro de visibilidade baseado em cargo (position)
+  if (position === "Diretor") {
+    // Diretor vê todos os deals — sem filtro de user_id
+  } else if (position === "SDR") {
+    // SDR vê deals de todos os Executivos de Negócios
+    query = executivoIds.length > 0
+      ? query.in("user_id", executivoIds)
+      : query.eq("user_id", "no-access-placeholder");
+  } else {
+    // Executivo de Negócios ou fallback — vê apenas os próprios deals
     query = query.eq("user_id", userId || "no-access-placeholder");
   }
 
@@ -72,7 +91,13 @@ export async function fetchDeals(role: UserRole, userId?: string): Promise<Deal[
     console.error("[fetchDeals] Erro na busca principal:", res.error);
     // Fallback: busca sem filtro se der erro de coluna
     let fallbackQuery = (supabase as any).from("deals").select("*");
-    if (role !== "admin") {
+    if (position === "Diretor") {
+      // Diretor vê tudo
+    } else if (position === "SDR") {
+      fallbackQuery = executivoIds.length > 0
+        ? fallbackQuery.in("user_id", executivoIds)
+        : fallbackQuery.eq("user_id", "no-access-placeholder");
+    } else {
       fallbackQuery = fallbackQuery.eq("user_id", userId || "no-access-placeholder");
     }
     res = await fallbackQuery.order("closing_date", { ascending: false });
@@ -137,19 +162,36 @@ export interface DbPresentation {
   is_test_data: boolean;
 }
 
-export async function fetchPresentations(role: UserRole, userId?: string): Promise<MonthlyPresentations> {
+export async function fetchPresentations(role: UserRole, userId?: string, position?: string): Promise<MonthlyPresentations> {
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
+
+  // Pré-buscar UUIDs de executivos se o usuário for SDR
+  let executivoIds: string[] = [];
+  if (position === "SDR") {
+    const { data: executivos } = await (supabase as any)
+      .from("profiles")
+      .select("user_id")
+      .eq("position", "Executivo de Negócios")
+      .eq("is_test_data", isTestEnv);
+    executivoIds = (executivos || []).map((p: any) => p.user_id);
+  }
 
   let query = (supabase as any)
     .from("presentations")
     .select("*")
     .eq("is_test_data", isTestEnv);
 
-  if (userId) {
-    query = query.eq("user_id", userId);
-  } else if (role !== "admin") {
-    query = query.eq("user_id", user?.id || "no-access-placeholder");
+  if (position === "Diretor") {
+    // Diretor vê todas as presentations — sem filtro de user_id
+  } else if (position === "SDR") {
+    // SDR vê presentations dos Executivos de Negócios
+    query = executivoIds.length > 0
+      ? query.in("user_id", executivoIds)
+      : query.eq("user_id", "no-access-placeholder");
+  } else {
+    // Executivo de Negócios ou fallback — vê apenas as próprias presentations
+    query = query.eq("user_id", userId || user?.id || "no-access-placeholder");
   }
 
   const { data, error } = await query;

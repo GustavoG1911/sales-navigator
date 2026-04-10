@@ -9,6 +9,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   role: UserRole;
+  position: string;
   signOut: () => Promise<void>;
 }
 
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   role: "user",
+  position: "",
   signOut: async () => {},
 });
 
@@ -26,24 +28,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<UserRole>("user");
+  const [position, setPosition] = useState<string>("");
 
   const fetchRole = async (userId: string) => {
     try {
       // Tenta buscar o perfil do usuário
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, position")
         .eq("user_id", userId)
         .maybeSingle();
 
       if (profile && !error) {
         setRole(profile.role as UserRole);
+        setPosition(profile.position ?? "");
       } else {
         setRole("user");
+        setPosition("");
       }
     } catch (err) {
       console.warn("[useAuth] Erro ao carregar role, usando padrão 'user'");
       setRole("user");
+      setPosition("");
     } finally {
       setLoading(false);
     }
@@ -62,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setLoading(false);
         setRole("user");
+        setPosition("");
       }
     });
 
@@ -85,11 +92,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setSession(null);
     setRole("user");
+    setPosition("");
     setLoading(false);
   };
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, role, signOut }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, role, position, signOut }}>
       {children}
     </AuthContext.Provider>
   );
