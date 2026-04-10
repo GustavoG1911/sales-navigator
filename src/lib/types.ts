@@ -4,6 +4,7 @@ export type PaymentStatus = "Pendente" | "Pago" | "Cancelado";
 
 export interface InstallmentDate {
   date: string; // ISO string
+  paid?: boolean;
 }
 
 export interface Deal {

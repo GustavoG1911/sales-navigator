@@ -209,8 +209,8 @@ function TeamTab() {
       const { data: { user } } = await supabase.auth.getUser();
       const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
-      let query = supabase
-        .from("profiles")
+      let query = (supabase
+        .from("profiles") as any)
         .select("id, user_id, display_name, full_name, role, job_title, position, created_at")
         .eq("is_test_data", isTestEnv)
         .order("created_at", { ascending: true });
@@ -237,9 +237,10 @@ function TeamTab() {
   }, []);
 
   const handleUpdateField = async (userId: string, field: "role" | "position", newRole: string) => {
-    const { error } = await supabase
+    const updatePayload: Record<string, string> = { [field]: newRole };
+    const { error } = await (supabase
       .from("profiles")
-      .update({ [field]: newRole })
+      .update(updatePayload as any) as any)
       .eq("user_id", userId);
     if (error) {
       toast.error(`Erro ao alterar ${field}: ` + error.message);
