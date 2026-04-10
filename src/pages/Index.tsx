@@ -28,6 +28,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 export default function Index() {
   const queryClient = useQueryClient();
   const { role, user, position } = useAuth();
+  const isDirector = position === "Diretor";
   const { deals = [], loading, presentations, updatePresentations, settings, updateSettings, superMeta, toggleSuperMeta, addOrUpdateDeal, removeDeal } = useAppData(role, user?.id, position);
 
   // ESTADOS E DATAS (Devem vir antes de qualquer useMemo)
@@ -102,14 +103,10 @@ export default function Index() {
       const { monthKey } = getPaymentDateInfo(baseDate);
       const passDate = monthKey === selectedMonthKey;
 
-      if (position === "Diretor") {
-        const passOp = filtroOperacao === "Todas" || d.operation === filtroOperacao;
-        const passUser = filtroFuncionario === "Todos" || d.userId === filtroFuncionario;
-        return passDate && passOp && passUser;
-      }
-      return passDate;
+      if (isDirector) return passDate;
+      return passDate && d.userId === user?.id;
     }),
-    [deals, selectedMonthKey, filtroOperacao, filtroFuncionario, position]
+    [deals, selectedMonthKey, isDirector, user?.id]
   );
 
   const filteredDeals = closedDeals; // Fallback for table and other uses
