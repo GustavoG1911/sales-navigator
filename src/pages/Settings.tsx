@@ -12,8 +12,10 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Users, Save, Shield, UserCog, User, Loader2 } from "lucide-react";
+import { Users, Save, Shield, UserCog, User, Loader2, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import { useAppData } from "@/hooks/useAppData";
 
 export default function Settings() {
   const { role, loading: authLoading } = useAuth();
