@@ -167,15 +167,15 @@ export async function fetchPresentations(role: UserRole, userId?: string, positi
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
-  // Pré-buscar UUIDs de executivos se o usuário for SDR
-  let executivoIds: string[] = [];
-  if (position === "SDR") {
-    const { data: executivos } = await (supabase as any)
+  // Executivo de Negócios e SDR precisam ver as apresentações da SDR para calcular o tier de comissão
+  let sdrIds: string[] = [];
+  if (position === "Executivo de Negócios") {
+    const { data: sdrs } = await (supabase as any)
       .from("profiles")
       .select("user_id")
-      .eq("position", "Executivo de Negócios")
+      .eq("position", "SDR")
       .eq("is_test_data", isTestEnv);
-    executivoIds = (executivos || []).map((p: any) => p.user_id);
+    sdrIds = (sdrs || []).map((p: any) => p.user_id);
   }
 
   let query = (supabase as any)
@@ -185,13 +185,13 @@ export async function fetchPresentations(role: UserRole, userId?: string, positi
 
   if (position === "Diretor") {
     // Diretor vê todas as presentations — sem filtro de user_id
-  } else if (position === "SDR") {
-    // SDR vê presentations dos Executivos de Negócios
-    query = executivoIds.length > 0
-      ? query.in("user_id", executivoIds)
+  } else if (position === "Executivo de Negócios") {
+    // Executivo vê as apresentações da SDR para determinar o tier de comissão
+    query = sdrIds.length > 0
+      ? query.in("user_id", sdrIds)
       : query.eq("user_id", "no-access-placeholder");
   } else {
-    // Executivo de Negócios ou fallback — vê apenas as próprias presentations
+    // SDR vê as próprias apresentações
     query = query.eq("user_id", userId || user?.id || "no-access-placeholder");
   }
 
@@ -221,33 +221,31 @@ export async function savePresentationToDb(monthKey: string, operation: "bluepex
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
-  // Read existing row to preserve the other field's value
-  const { data: existing } = await (supabase as any)
+  const field = operation === "bluepex" ? "bluepex_count" : "opus_count";
+
+  // Try to update an existing row first (handles any duplicates gracefully)
+  const { data: updated, error: updateErr } = await (supabase as any)
     .from("presentations")
-    .select("id, bluepex_count, opus_count")
+    .update({ [field]: count })
     .eq("month_key", monthKey)
     .eq("user_id", userId)
-    .maybeSingle();
+    .select("id");
 
-  const payload: any = {
-    month_key: monthKey,
-    user_id: userId,
-    is_test_data: isTestEnv,
-    bluepex_count: (existing as any)?.bluepex_count ?? 0,
-    opus_count: (existing as any)?.opus_count ?? 0,
-  };
+  if (updateErr) throw updateErr;
 
-  // Include existing id so Supabase updates the row instead of inserting
-  if ((existing as any)?.id) payload.id = (existing as any).id;
-
-  if (operation === "bluepex") payload.bluepex_count = count;
-  else payload.opus_count = count;
-
-  // onConflict ensures an existing (month_key, user_id) row is updated, not duplicated
-  const { error } = await (supabase as any)
-    .from("presentations")
-    .upsert(payload, { onConflict: "month_key,user_id" });
-  if (error) throw error;
+  // No existing row — insert a fresh one
+  if (!updated || updated.length === 0) {
+    const { error: insertErr } = await (supabase as any)
+      .from("presentations")
+      .insert({
+        month_key: monthKey,
+        user_id: userId,
+        is_test_data: isTestEnv,
+        bluepex_count: operation === "bluepex" ? count : 0,
+        opus_count: operation === "opus" ? count : 0,
+      });
+    if (insertErr) throw insertErr;
+  }
 }
 
 export async function fetchUserCommissionRate(userId: string): Promise<number | null> {

@@ -62,13 +62,16 @@ export function calculateCommission(
 }
 
 /**
- * Get the presentations count for a specific deal based on its operation and closing month.
+ * Get the presentations count for a specific deal based on its FINANCIAL month.
+ * Uses the same Regra do Dia 07 logic as the KPI filters so that the commission
+ * tier always matches the month the deal is counted in, not the closing month.
  */
 export function getPresentationsForDeal(
   deal: Deal,
   presentations: MonthlyPresentations
 ): number {
-  const monthKey = getMonthKey(deal.closingDate);
+  const baseDate = deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
+  const { monthKey } = getPaymentDateInfo(baseDate);
   const monthData = presentations[monthKey] || { bluepex: 0, opus: 0 };
   return deal.operation === "BluePex" ? monthData.bluepex : monthData.opus;
 }
