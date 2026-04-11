@@ -28,8 +28,8 @@ const iconStyles = {
 
 export function KpiCard({ title, value, icon: Icon, trend, variant = "default", tooltip, onClick }: KpiCardProps) {
   return (
-    <Card 
-      className={`glass-card ${variantStyles[variant]} ${onClick ? "cursor-pointer hover:shadow-md transition-all duration-200" : ""}`}
+    <Card
+      className={`glass-card transition-all duration-200 ${variantStyles[variant]} ${onClick ? "cursor-pointer hover:shadow-md hover:scale-[1.02]" : ""}`}
       onClick={onClick}
     >
       <CardContent className="p-4">

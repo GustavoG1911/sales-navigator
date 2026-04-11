@@ -56,7 +56,13 @@ export default function Index() {
 
   // LOGICA DERIVADA (Somente após os estados)
   const isSingleMonth = dateRange.from.getMonth() === dateRange.to.getMonth() && dateRange.from.getFullYear() === dateRange.to.getFullYear();
-  const currentMonthPres = presentations?.[selectedMonthKey] || { bluepex: 0, opus: 0 };
+  // Optimistic presentations: updates immediately on PresentationsCard change, syncs from DB on round-trip
+  const [optimisticPresentations, setOptimisticPresentations] = useState(presentations);
+  useEffect(() => {
+    setOptimisticPresentations(presentations);
+  }, [presentations]);
+
+  const currentMonthPres = optimisticPresentations?.[selectedMonthKey] || { bluepex: 0, opus: 0 };
 
   const handlePeriodChange = (range: DateRange, label: string, type: PeriodType) => {
     setDateRange(range);
@@ -121,7 +127,8 @@ export default function Index() {
     [deals, selectedMonthKey, isSingleMonth, dateRange, isDirector, filtroOperacao, filtroFuncionario, user?.id]
   );
 
-  const filteredDeals = closedDeals; // Fallback for table and other uses
+  // Table mirrors exactly the same deals that compose the KPIs (payment-date competência / Regra do Dia 07)
+  const filteredDeals = financialDeals;
 
   // Timeline Data for Charts
   const chartTimeline = useMemo(() => {
@@ -194,7 +201,7 @@ export default function Index() {
 
     financialDeals.forEach(deal => {
       totalVolumeBruto += (deal.monthlyValue || 0) + (deal.implantationValue || 0);
-      const presCount = getPresentationsForDeal(deal, presentations);
+      const presCount = getPresentationsForDeal(deal, optimisticPresentations);
       const comm = calculateCommission(deal, presCount, settings, false);
       totalComissoes += comm.totalCommission;
     });
@@ -235,7 +242,7 @@ export default function Index() {
         modalType: null
       }
     ];
-  }, [financialDeals, presentations, settings]);
+  }, [financialDeals, optimisticPresentations, settings]);
 
   const handleStatusChange = async (deal: Deal, status: PaymentStatus) => {
     await addOrUpdateDeal({ ...deal, paymentStatus: status });
@@ -271,7 +278,7 @@ export default function Index() {
   const handleDownloadReport = () => {
     downloadReportPDF({
       deals: filteredDeals,
-      presentations,
+      presentations: optimisticPresentations,
       salary: settings.fixedSalary,
       periodLabel,
       settings,
@@ -282,7 +289,7 @@ export default function Index() {
   const handlePrintReport = () => {
     printReport({
       deals: filteredDeals,
-      presentations,
+      presentations: optimisticPresentations,
       salary: settings.fixedSalary,
       periodLabel,
       settings,
@@ -367,7 +374,16 @@ export default function Index() {
             <div className="my-6">
               <PresentationsCard
                 presentations={currentMonthPres}
-                onUpdate={(op, count) => updatePresentations(selectedMonthKey, op, count)}
+                onUpdate={(op, count) => {
+                  setOptimisticPresentations(prev => ({
+                    ...prev,
+                    [selectedMonthKey]: {
+                      ...(prev[selectedMonthKey] || { bluepex: 0, opus: 0 }),
+                      [op]: count,
+                    },
+                  }));
+                  updatePresentations(selectedMonthKey, op, count);
+                }}
                 settings={settings}
               />
             </div>
@@ -505,7 +521,7 @@ export default function Index() {
           <div id="deals-table-container">
             <DealsTable
               deals={filteredDeals}
-              presentations={presentations}
+              presentations={optimisticPresentations}
               settings={settings}
               superMetaActive={false}
               onEdit={handleEdit}

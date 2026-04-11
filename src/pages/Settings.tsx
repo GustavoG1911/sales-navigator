@@ -105,8 +105,6 @@ function ProfileTab() {
   const [form, setForm] = useState({
     full_name: "",
     job_title: "",
-    fixed_salary: 0,
-    commission_percent: 20,
     position: "SDR",
     role: "user",
   });
@@ -115,7 +113,7 @@ function ProfileTab() {
     if (!user) return;
     supabase
       .from("profiles")
-      .select("full_name, job_title, fixed_salary, commission_percent, position, role")
+      .select("full_name, job_title, position, role")
       .eq("user_id", user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -123,8 +121,6 @@ function ProfileTab() {
           setForm({
             full_name: data.full_name || "",
             job_title: data.job_title || "",
-            fixed_salary: data.fixed_salary || 0,
-            commission_percent: data.commission_percent || 20,
             position: data.position || "SDR",
             role: data.role || "user",
           });
@@ -143,8 +139,6 @@ function ProfileTab() {
     const updateData: any = {
       full_name: form.full_name.trim(),
       job_title: form.job_title.trim(),
-      fixed_salary: form.fixed_salary,
-      commission_percent: form.commission_percent,
       position: form.position,
     };
 
@@ -219,16 +213,6 @@ function ProfileTab() {
               </Select>
               {/* Optional fallback if they type something completely custom: it could just be a select or an input. The user said Input/Select. We'll use just Select for simplicity but you can type in Input as well */}
             </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Salário Fixo (R$)</Label>
-            <Input type="number" min="0" value={form.fixed_salary} onChange={(e) => setForm({ ...form, fixed_salary: Number(e.target.value) })} className="font-mono" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Comissão (%)</Label>
-            <Input type="number" min="0" max="100" value={form.commission_percent} onChange={(e) => setForm({ ...form, commission_percent: Number(e.target.value) })} className="font-mono" />
           </div>
         </div>
         <Button onClick={handleSave} disabled={saving} className="w-full">

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Deal, PaymentStatus, AppSettings, MonthlyPresentations } from "@/lib/types";
 import { calculateCommission, formatCurrency, getPresentationsForDeal } from "@/lib/commission";
-import { Pencil, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { Pencil, Trash2, ChevronDown, ChevronRight, PackageOpen } from "lucide-react";
 import { format } from "date-fns";
 
 interface DealsTableProps {
@@ -69,8 +69,12 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
           </span>
         </div>
         {deals.length === 0 ? (
-          <div className="px-4 pb-6 pt-4 text-center text-sm text-muted-foreground">
-            Nenhum fechamento encontrado.
+          <div className="flex flex-col items-center justify-center py-12 px-4 gap-3">
+            <PackageOpen className="h-10 w-10 text-muted-foreground/30" />
+            <div className="text-center">
+              <p className="text-sm font-medium text-muted-foreground">Nenhum fechamento no período</p>
+              <p className="text-xs text-muted-foreground/60 mt-0.5">Ajuste o filtro de período ou registre um novo fechamento.</p>
+            </div>
           </div>
         ) : (
           <Table className="w-full">
