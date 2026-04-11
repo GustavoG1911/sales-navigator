@@ -154,25 +154,18 @@ export async function fetchAvailableYears(): Promise<number[]> {
   return Array.from(years).sort((a, b) => b - a);
 }
 
-export interface DbPresentation {
-  id?: string;
-  user_id: string;
-  month_key: string;
-  bluepex_count: number;
-  opus_count: number;
-  is_test_data: boolean;
-}
+// Schema real da tabela presentations:
+// id, user_id, operation ("BluePex" | "Opus Tech"), count, date ("YYYY-MM-DD"), is_test_data
+// Uma linha por operação por mês — contador global compartilhado entre todos os cargos.
 
 export async function fetchPresentations(role: UserRole, userId?: string, position?: string): Promise<MonthlyPresentations> {
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
-  // Apresentações são um contador GLOBAL — não filtradas por usuário.
-  // Qualquer cargo (Executivo, SDR, Diretor) vê o mesmo número.
-  // A agregação por month_key combina todas as linhas do mesmo mês.
+  // Apresentações são globais: todos os cargos veem o mesmo contador.
   const { data, error } = await (supabase as any)
     .from("presentations")
-    .select("*")
+    .select("operation, count, date")
     .eq("is_test_data", isTestEnv);
 
   if (error) {
@@ -182,10 +175,11 @@ export async function fetchPresentations(role: UserRole, userId?: string, positi
 
   const result: MonthlyPresentations = {};
   data?.forEach((p: any) => {
-    const key = p.month_key;
+    // date = "YYYY-MM-DD" → monthKey = "YYYY-MM"
+    const key = (p.date as string).slice(0, 7);
     if (!result[key]) result[key] = { bluepex: 0, opus: 0 };
-    result[key].bluepex += p.bluepex_count;
-    result[key].opus += p.opus_count;
+    if (p.operation === "BluePex") result[key].bluepex += p.count ?? 0;
+    else result[key].opus += p.count ?? 0;
   });
 
   return result;
@@ -195,14 +189,17 @@ export async function savePresentationToDb(monthKey: string, operation: "bluepex
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
-  const field = operation === "bluepex" ? "bluepex_count" : "opus_count";
+  // Mapeia o campo frontend para o valor da coluna operation no banco
+  const dbOperation = operation === "bluepex" ? "BluePex" : "Opus Tech";
+  // Usa o primeiro dia do mês como data canônica
+  const dateStr = monthKey + "-01";
 
-  // Apresentações são globais: busca qualquer linha do mês (ignora user_id)
-  // e atualiza. Se não existir nenhuma, cria sob o userId do usuário atual.
+  // Busca linha canônica do mês+operação (global, ignora user_id)
   const { data: existing, error: readErr } = await (supabase as any)
     .from("presentations")
-    .select("id, bluepex_count, opus_count")
-    .eq("month_key", monthKey)
+    .select("id")
+    .eq("date", dateStr)
+    .eq("operation", dbOperation)
     .eq("is_test_data", isTestEnv)
     .limit(1)
     .maybeSingle();
@@ -210,22 +207,22 @@ export async function savePresentationToDb(monthKey: string, operation: "bluepex
   if (readErr) throw readErr;
 
   if (existing?.id) {
-    // Atualiza apenas o campo alterado na linha canônica do mês
+    // Atualiza a linha existente pelo id
     const { error: updateErr } = await (supabase as any)
       .from("presentations")
-      .update({ [field]: count })
+      .update({ count })
       .eq("id", existing.id);
     if (updateErr) throw updateErr;
   } else {
-    // Nenhuma linha para este mês — cria a primeira
+    // Insere nova linha para este mês+operação
     const { error: insertErr } = await (supabase as any)
       .from("presentations")
       .insert({
-        month_key: monthKey,
         user_id: userId,
+        operation: dbOperation,
+        count,
+        date: dateStr,
         is_test_data: isTestEnv,
-        bluepex_count: operation === "bluepex" ? count : 0,
-        opus_count: operation === "opus" ? count : 0,
       });
     if (insertErr) throw insertErr;
   }

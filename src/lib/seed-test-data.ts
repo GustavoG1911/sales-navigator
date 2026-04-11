@@ -113,11 +113,12 @@ function makeDeal(
 }
 
 // ─── Tipo de Apresentação para inserção ───
+// Schema real: operation ("BluePex"|"Opus Tech"), count, date ("YYYY-MM-DD")
 interface SeedPresentation {
-  month_key: string;
   user_id: string;
-  bluepex_count: number;
-  opus_count: number;
+  operation: "BluePex" | "Opus Tech";
+  count: number;
+  date: string; // primeiro dia do mês: "YYYY-MM-01"
   is_test_data: true;
 }
 
@@ -202,14 +203,18 @@ function buildDeals(): SeedDeal[] {
 
 function buildPresentations(): SeedPresentation[] {
   return [
-    // Janeiro 2026 — Abaixo da Meta
-    { month_key: "2026-01", user_id: SDR_ID, bluepex_count: 8,  opus_count: 6,  is_test_data: true },
-    // Fevereiro 2026 — Meta exata (15 BP)
-    { month_key: "2026-02", user_id: SDR_ID, bluepex_count: 15, opus_count: 12, is_test_data: true },
-    // Março 2026 — Super Meta (32 BP)
-    { month_key: "2026-03", user_id: SDR_ID, bluepex_count: 32, opus_count: 10, is_test_data: true },
-    // Abril 2026 — Em andamento
-    { month_key: "2026-04", user_id: SDR_ID, bluepex_count: 10, opus_count: 8,  is_test_data: true },
+    // Janeiro 2026 — Abaixo da Meta (BP=8, OP=6)
+    { user_id: EXECUTIVO_ID, operation: "BluePex",   count: 8,  date: "2026-01-01", is_test_data: true },
+    { user_id: EXECUTIVO_ID, operation: "Opus Tech", count: 6,  date: "2026-01-01", is_test_data: true },
+    // Fevereiro 2026 — Meta exata (BP=15, OP=12)
+    { user_id: EXECUTIVO_ID, operation: "BluePex",   count: 15, date: "2026-02-01", is_test_data: true },
+    { user_id: EXECUTIVO_ID, operation: "Opus Tech", count: 12, date: "2026-02-01", is_test_data: true },
+    // Março 2026 — Super Meta (BP=32, OP=10)
+    { user_id: EXECUTIVO_ID, operation: "BluePex",   count: 32, date: "2026-03-01", is_test_data: true },
+    { user_id: EXECUTIVO_ID, operation: "Opus Tech", count: 10, date: "2026-03-01", is_test_data: true },
+    // Abril 2026 — Em andamento (BP=10, OP=8)
+    { user_id: EXECUTIVO_ID, operation: "BluePex",   count: 10, date: "2026-04-01", is_test_data: true },
+    { user_id: EXECUTIVO_ID, operation: "Opus Tech", count: 8,  date: "2026-04-01", is_test_data: true },
   ];
 }
 
@@ -232,12 +237,11 @@ export async function seedHistoricalData() {
   if (delDealsErr) console.error("   ❌ Erro ao limpar deals:", delDealsErr.message);
   else console.log("   ✅ Deals antigos removidos.\n");
 
-  // Step 2: Limpar apresentações de teste da SDR
+  // Step 2: Limpar TODAS as apresentações de teste (globais — não por user_id)
   console.log("🗑️  Limpando apresentações de teste anteriores...");
   const { error: delPresErr } = await (supabase as any)
     .from("presentations")
     .delete()
-    .eq("user_id", SDR_ID)
     .eq("is_test_data", true);
   if (delPresErr) console.error("   ❌ Erro ao limpar apresentações:", delPresErr.message);
   else console.log("   ✅ Apresentações antigas removidas.\n");
@@ -258,18 +262,18 @@ export async function seedHistoricalData() {
     }
   }
 
-  // Step 4: Inserir Apresentações (SDR)
+  // Step 4: Inserir Apresentações (schema real: operation + count + date)
   const allPres = buildPresentations();
-  console.log(`\n📋 Inserindo ${allPres.length} meses de apresentações (todos → SDR_ID)...`);
-  for (const pres of allPres) {
-    const { error } = await (supabase as any)
-      .from("presentations")
-      .upsert(pres, { onConflict: "month_key,user_id" });
-    if (error) {
-      console.error(`   ❌ Erro em ${pres.month_key}: ${error.message}`);
-    } else {
-      console.log(`   ✅ ${pres.month_key}: BP=${pres.bluepex_count}, OP=${pres.opus_count}`);
-    }
+  console.log(`\n📋 Inserindo ${allPres.length} linhas de apresentações...`);
+  const { data: presData, error: presErr } = await (supabase as any)
+    .from("presentations")
+    .insert(allPres)
+    .select("id");
+  if (presErr) {
+    console.error(`   ❌ Erro ao inserir apresentações: ${presErr.message}`);
+  } else {
+    console.log(`   ✅ ${presData?.length || 0} linhas inseridas.`);
+    allPres.forEach(p => console.log(`      ${p.date} | ${p.operation}: ${p.count}`));
   }
 
   // Step 5: Relatório
@@ -283,7 +287,7 @@ export async function seedHistoricalData() {
   console.log("📋 RELATÓRIO FINAL");
   console.log("═══════════════════════════════════════");
   console.log(`   Deals no banco (EXECUTIVO, is_test_data=true): ${dealCount}`);
-  console.log(`   Apresentações inseridas: ${allPres.length} meses`);
+  console.log(`   Apresentações inseridas: ${allPres.length} linhas (2 por mês × 4 meses)`);
   console.log("");
   console.log("   Cenários de Comissão:");
   console.log("   ├─ Jan/2026: BP=8,  OP=6  → Abaixo da Meta (mult. 70%)");
