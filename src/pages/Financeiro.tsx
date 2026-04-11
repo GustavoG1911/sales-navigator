@@ -511,17 +511,8 @@ function FinanceiroContent() {
     let totalPago = 0;
     let volumeTotal = 0;
 
-    activeDeals.forEach((deal) => {
-      // Logic for commission calculation
-      const baseDate = deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
-      if (!baseDate) return;
-      const { monthKey } = getPaymentDateInfo(baseDate);
-      
-      // If monthly view, must match selectedMonth
-      if (filterType === "month" && monthKey !== selectedMonth) return;
-      // If yearly view, use competência monthKey (respects Regra do Dia 07)
-      if (filterType === "year" && !monthKey.startsWith(selectedYear)) return;
-
+    // filteredDeals already has time, operation, user, and status filters applied
+    filteredDeals.forEach((deal) => {
       volumeTotal += deal.monthlyValue + deal.implantationValue;
 
       const presCount = getPresentationsForDeal(deal, presentations);
@@ -535,12 +526,13 @@ function FinanceiroContent() {
     });
 
     return { totalFixo, totalProjetado, totalPago, volumeTotal };
-  }, [filteredDeals, filteredSalaries, selectedMonth, filterType, selectedYear, presentations, settings]);
+  }, [filteredDeals, filteredSalaries, presentations, settings]);
 
   const futureProjections = useMemo(() => {
     const projMap: Record<string, { projectedIn: number, projectedOut: number }> = {};
     activeDeals.forEach((deal) => {
-      // Respect user filter for projections
+      // Respect operation and user filters
+      if (filtroOperacao !== "Todas" && deal.operation !== filtroOperacao) return;
       if (filtroFuncionario !== "Todos" && deal.userId !== filtroFuncionario) return;
 
       const baseDate = deal.firstPaymentDate || deal.implantationPaymentDate;
@@ -566,7 +558,7 @@ function FinanceiroContent() {
       .map(([key, vals]) => ({ monthKey: key, ...vals }))
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
       .slice(0, 6); // Limita projeção
-  }, [activeDeals, selectedMonth, filterType, selectedYear, presentations, settings]);
+  }, [activeDeals, selectedMonth, filterType, selectedYear, filtroOperacao, filtroFuncionario, presentations, settings]);
 
   // Deals with confirmed client payment (ready for payout)
   const payableDeals = useMemo(() => {

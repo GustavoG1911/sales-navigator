@@ -76,7 +76,7 @@ export function PresentationsCard({ presentations, onUpdate, settings }: Present
   useEffect(() => {
     setBluepexCount(presentations?.bluepex ?? 0);
     setOpusCount(presentations?.opus ?? 0);
-  }, [presentations?.bluepex, presentations?.opus]);
+  }, [presentations]);
 
   const handleBluepexChange = (val: number) => {
     setBluepexCount(val);

@@ -126,8 +126,9 @@ export async function deleteDealFromDb(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function fetchAvailableYears(email: string): Promise<number[]> {
-  const isTestEnv = email.endsWith("@teste.com");
+export async function fetchAvailableYears(): Promise<number[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const isTestEnv = user?.email?.endsWith("@teste.com") || false;
   const { data, error } = await (supabase as any)
     .from("deals")
     .select("closing_date")

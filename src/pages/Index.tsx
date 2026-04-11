@@ -78,8 +78,8 @@ export default function Index() {
   }, [position]);
 
   useEffect(() => {
-    fetchAvailableYears(user?.email || "").then(setAvailableYears);
-  }, [user?.email]);
+    fetchAvailableYears().then(setAvailableYears);
+  }, []);
 
   // Deals filtered by CLOSING DATE (for Counts and Volume)
   const closedDeals = useMemo(
@@ -111,10 +111,14 @@ export default function Index() {
         passDate = monthKey >= fromKey && monthKey <= toKey;
       }
 
-      if (isDirector) return passDate;
+      if (isDirector) {
+        const passOp = filtroOperacao === "Todas" || d.operation === filtroOperacao;
+        const passUser = filtroFuncionario === "Todos" || d.userId === filtroFuncionario;
+        return passDate && passOp && passUser;
+      }
       return passDate && d.userId === user?.id;
     }),
-    [deals, selectedMonthKey, isSingleMonth, dateRange, isDirector, user?.id]
+    [deals, selectedMonthKey, isSingleMonth, dateRange, isDirector, filtroOperacao, filtroFuncionario, user?.id]
   );
 
   const filteredDeals = closedDeals; // Fallback for table and other uses
