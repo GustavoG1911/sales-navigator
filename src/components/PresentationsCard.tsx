@@ -47,7 +47,7 @@ function CounterInput({
       <input
         type="number"
         min={0}
-        value={value || 0}
+        value={value ?? 0}
         onChange={(e) => {
           const parsed = parseInt(e.target.value, 10);
           onChange(Number.isNaN(parsed) ? 0 : Math.max(0, parsed));

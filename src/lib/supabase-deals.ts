@@ -221,10 +221,10 @@ export async function savePresentationToDb(monthKey: string, operation: "bluepex
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
-  // First, get existing
+  // Read existing row to preserve the other field's value
   const { data: existing } = await (supabase as any)
     .from("presentations")
-    .select("*")
+    .select("id, bluepex_count, opus_count")
     .eq("month_key", monthKey)
     .eq("user_id", userId)
     .maybeSingle();
@@ -233,14 +233,20 @@ export async function savePresentationToDb(monthKey: string, operation: "bluepex
     month_key: monthKey,
     user_id: userId,
     is_test_data: isTestEnv,
-    bluepex_count: (existing as any)?.bluepex_count || 0,
-    opus_count: (existing as any)?.opus_count || 0,
+    bluepex_count: (existing as any)?.bluepex_count ?? 0,
+    opus_count: (existing as any)?.opus_count ?? 0,
   };
+
+  // Include existing id so Supabase updates the row instead of inserting
+  if ((existing as any)?.id) payload.id = (existing as any).id;
 
   if (operation === "bluepex") payload.bluepex_count = count;
   else payload.opus_count = count;
 
-  const { error } = await (supabase as any).from("presentations").upsert(payload);
+  // onConflict ensures an existing (month_key, user_id) row is updated, not duplicated
+  const { error } = await (supabase as any)
+    .from("presentations")
+    .upsert(payload, { onConflict: "month_key,user_id" });
   if (error) throw error;
 }
 

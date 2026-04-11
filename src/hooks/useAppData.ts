@@ -73,7 +73,7 @@ export function useAppData(role: UserRole = "user", userId?: string, position?: 
       console.error("Error saving presentations:", err);
       toast.error("Erro ao salvar apresentações");
     }
-  }, [role, userId]);
+  }, [role, userId, position]);
 
   const updateSettings = useCallback(async (newSettings: AppSettings) => {
     saveSettings(newSettings);
