@@ -6,7 +6,8 @@
       "Bash(npx supabase:*)",
       "Bash(cat .env.local)",
       "Bash(cat .env.production)",
-      "Bash(grep -i \"service\\\\|secret\\\\|SERVICE\" .env)"
+      "Bash(grep -i \"service\\\\|secret\\\\|SERVICE\" .env)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }
