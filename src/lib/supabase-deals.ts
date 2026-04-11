@@ -167,35 +167,13 @@ export async function fetchPresentations(role: UserRole, userId?: string, positi
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
 
-  // Executivo de Negócios e SDR precisam ver as apresentações da SDR para calcular o tier de comissão
-  let sdrIds: string[] = [];
-  if (position === "Executivo de Negócios") {
-    const { data: sdrs } = await (supabase as any)
-      .from("profiles")
-      .select("user_id")
-      .eq("position", "SDR")
-      .eq("is_test_data", isTestEnv);
-    sdrIds = (sdrs || []).map((p: any) => p.user_id);
-  }
-
-  let query = (supabase as any)
+  // Apresentações são um contador GLOBAL — não filtradas por usuário.
+  // Qualquer cargo (Executivo, SDR, Diretor) vê o mesmo número.
+  // A agregação por month_key combina todas as linhas do mesmo mês.
+  const { data, error } = await (supabase as any)
     .from("presentations")
     .select("*")
     .eq("is_test_data", isTestEnv);
-
-  if (position === "Diretor") {
-    // Diretor vê todas as presentations — sem filtro de user_id
-  } else if (position === "Executivo de Negócios") {
-    // Executivo vê as apresentações da SDR para determinar o tier de comissão
-    query = sdrIds.length > 0
-      ? query.in("user_id", sdrIds)
-      : query.eq("user_id", "no-access-placeholder");
-  } else {
-    // SDR vê as próprias apresentações
-    query = query.eq("user_id", userId || user?.id || "no-access-placeholder");
-  }
-
-  const { data, error } = await query;
 
   if (error) {
     console.error("[fetchPresentations] Erro:", error);
@@ -204,10 +182,6 @@ export async function fetchPresentations(role: UserRole, userId?: string, positi
 
   const result: MonthlyPresentations = {};
   data?.forEach((p: any) => {
-    // If Admin, we might have multiple users for the same month.
-    // We should aggregate them if we want a global view, but useAppData handles the full list.
-    // For simplicity, we'll store them by month but we need to decide if we aggregate here or later.
-    // If the user selects a specific SDR, we only get their rows.
     const key = p.month_key;
     if (!result[key]) result[key] = { bluepex: 0, opus: 0 };
     result[key].bluepex += p.bluepex_count;
@@ -223,18 +197,27 @@ export async function savePresentationToDb(monthKey: string, operation: "bluepex
 
   const field = operation === "bluepex" ? "bluepex_count" : "opus_count";
 
-  // Try to update an existing row first (handles any duplicates gracefully)
-  const { data: updated, error: updateErr } = await (supabase as any)
+  // Apresentações são globais: busca qualquer linha do mês (ignora user_id)
+  // e atualiza. Se não existir nenhuma, cria sob o userId do usuário atual.
+  const { data: existing, error: readErr } = await (supabase as any)
     .from("presentations")
-    .update({ [field]: count })
+    .select("id, bluepex_count, opus_count")
     .eq("month_key", monthKey)
-    .eq("user_id", userId)
-    .select("id");
+    .eq("is_test_data", isTestEnv)
+    .limit(1)
+    .maybeSingle();
 
-  if (updateErr) throw updateErr;
+  if (readErr) throw readErr;
 
-  // No existing row — insert a fresh one
-  if (!updated || updated.length === 0) {
+  if (existing?.id) {
+    // Atualiza apenas o campo alterado na linha canônica do mês
+    const { error: updateErr } = await (supabase as any)
+      .from("presentations")
+      .update({ [field]: count })
+      .eq("id", existing.id);
+    if (updateErr) throw updateErr;
+  } else {
+    // Nenhuma linha para este mês — cria a primeira
     const { error: insertErr } = await (supabase as any)
       .from("presentations")
       .insert({
