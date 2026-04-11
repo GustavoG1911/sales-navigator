@@ -55,11 +55,19 @@ Supabase (snake_case)
 
 ### Regra do Dia 07 (Transbordo)
 Negócios onde o primeiro pagamento ocorre APÓS o dia 07 do mês são contabilizados financeiramente apenas no mês seguinte. Lógica em `getPaymentDateInfo`.
+- Filtros anuais/trimestrais DEVEM usar `getPaymentDateInfo(baseDate).monthKey` para respeitar esta regra — nunca `new Date(baseDate).getFullYear()` diretamente.
 
 ### Aceleradores de Comissão
 - 15 apresentações = Meta (100%) → multiplicador ativo
 - 30 apresentações = Super Meta (200%) → multiplicador máximo
 - Abaixo de 15 = sem acelerador
+
+### commissionRate — Fonte de Verdade: Banco de Dados
+`commissionRate` vem de `profiles.commission_percent` (inteiro, ex: 20 = 20%).
+- Leitura: `fetchUserCommissionRate(userId)` em `supabase-deals.ts` → divide por 100
+- Gravação: `saveUserCommissionRate(userId, rate)` → multiplica por 100
+- `useAppData.loadData` busca e injeta em `settings.commissionRate` em paralelo com deals/presentations
+- localStorage ainda é usado como fallback inicial, mas o valor do DB sempre sobrescreve
 
 ### Isolamento de Ambiente
 Usuários com email `@teste.com` operam em banco isolado (`is_test_data: true`). **NUNCA remover este filtro.**
@@ -76,40 +84,56 @@ Usuários com email `@teste.com` operam em banco isolado (`is_test_data: true`).
 6. **NÃO** colocar `useMemo` antes de `useState` em `Index.tsx` (causa Temporal Dead Zone).
 7. **NÃO** usar `role` para decisões de visibilidade de dados ou UI. Usar sempre `position`.
 8. **NÃO** gravar `role` a partir do cargo do usuário. O `OnboardingModal` salva cargo em `position`, nunca em `role`.
+9. **NÃO** usar `new Date(baseDate).getFullYear()` para filtros de ano no Financeiro. Usar `getPaymentDateInfo(baseDate).monthKey.startsWith(year)`.
+10. **NÃO** passar `user?.email` para `useAppData` ou `fetchAvailableYears`. Ambos resolvem o ambiente de teste internamente via `supabase.auth.getUser()`.
 
 ---
 
 ## Bugs — Estado Atual
 
 ### ✅ RESOLVIDO — user?.email → user?.id (Index.tsx e Settings.tsx)
-**Arquivos:** `src/pages/Index.tsx` (linha 31), `src/pages/Settings.tsx` (linha 22)
-**Problema:** `useAppData` era chamado com `user?.email` no lugar de `user?.id` (UUID). O fetch de presentations retornava vazio porque o filtro `user_id` no banco não batia com um e-mail, e saves falhavam silenciosamente.
-**Fix aplicado:** Trocado para `user?.id` em ambos os arquivos. Todos os 4 call sites de `useAppData` no projeto agora passam `user?.id` corretamente.
+**Fix:** Trocado para `user?.id` em todos os call sites. `fetchAvailableYears` não recebe mais email como parâmetro — resolve internamente.
 
-### ✅ RESOLVIDO — PresentationsCard travado
+### ✅ RESOLVIDO — PresentationsCard travado / badges não reagiam
 **Arquivo:** `src/components/PresentationsCard.tsx`
-**Problema:** Componente lia `presentations.bluepexCount` (camelCase) mas os dados vinham com chaves diferentes.
-**Fix aplicado:** O componente lê `presentations?.bluepex` e `presentations?.opus`, que batem com o mapeamento de `fetchPresentations` em `supabase-deals.ts` (`bluepex_count` → `bluepex`, `opus_count` → `opus`).
+**Fix 1:** Componente lê `presentations?.bluepex` e `presentations?.opus` (mapeamento correto).
+**Fix 2:** `useState` local com `useEffect` que observa `[presentations]` (objeto inteiro) — não campos individuais. Garante sync ao trocar mês e reatividade instantânea das badges.
 
-### ⏸️ AGUARDANDO TESTE — Divergência de totais Dashboard vs Financeiro
+### ✅ RESOLVIDO — Divergência de totais Dashboard vs Financeiro
 **Arquivo:** `src/pages/Index.tsx`
-**Problema:** Suspeita de divergência nos totais entre Dashboard e Financeiro. Ambas as telas já usam `calculateCommission` corretamente. Há uma diferença sutil no filtro: `financialDeals` no Dashboard aceita deals sem `userId` (`|| !d.userId`), enquanto o Financeiro não — pode causar contagem divergente em edge cases.
-**Pendente:** Confirmar com dados reais se a divergência existe antes de endurecer o filtro (risco de impacto no papel de admin).
+**Fix:** `financialDeals` usa `isDirector` + `passDate` puro para Diretor (espelha `activeDeals = deals` do Financeiro). Filtros `passOp`/`passUser` aplicados tanto em `financialDeals` quanto em `closedDeals` para unificação total.
 
 ### ✅ RESOLVIDO — SettingsPanel no lugar errado
-**Arquivo:** `src/pages/Settings.tsx`
-**Problema:** SettingsPanel deveria estar no Settings.tsx, não no Index.tsx.
-**Fix aplicado:** SettingsPanel está na aba "Metas e Comissões" (`value="comissions"`) do Settings.tsx. Não existe no Index.tsx.
+**Fix:** SettingsPanel está na aba "Metas e Comissões" do Settings.tsx. Não existe no Index.tsx.
 
 ### ✅ RESOLVIDO — UI Nesting (button > button) no PresentationsCard
-**Arquivo:** `src/components/PresentationsCard.tsx`
-**Problema:** `button cannot appear as a descendant of button` no PresentationsCard.
-**Fix aplicado:** `TooltipTrigger` usa `asChild` com `<span>`, evitando que o Radix renderize um `<button>` extra. Os botões do `CounterInput` ficam dentro de `<div>`, sem nesting inválido.
+**Fix:** `TooltipTrigger` usa `asChild` com `<span>`. Botões do `CounterInput` ficam dentro de `<div>`.
 
 ### ✅ RESOLVIDO — Separação de cargo (position) e permissão (role)
-**Arquivos:** `OnboardingModal.tsx`, `useAuth.tsx`, `supabase-deals.ts`, `useAppData.ts`, `Index.tsx`, `Financeiro.tsx`, `DealsTable.tsx`
-**Problema:** O sistema usava `role` para controlar visibilidade de dados e UI. `OnboardingModal` sobrescrevia o `role` do usuário ao salvar o cargo.
-**Fix aplicado:** `position` exposto pelo `useAuth`, filtros de banco e UI migrados para `position`, `OnboardingModal` para de tocar em `role`.
+**Fix:** `position` exposto pelo `useAuth`, filtros de banco e UI migrados para `position`, `OnboardingModal` para de tocar em `role`.
+
+### ✅ RESOLVIDO — commissionRate perdido no localStorage
+**Fix:** `fetchUserCommissionRate(userId)` lê `profiles.commission_percent` do DB. `useAppData.loadData` injeta em `settings.commissionRate`. `updateSettings` persiste no DB via `saveUserCommissionRate`. localStorage ainda serve de fallback inicial.
+
+### ✅ RESOLVIDO — Filtro anual ignorava Regra do Dia 07 no Financeiro
+**Arquivo:** `src/pages/Financeiro.tsx`
+**Fix:** `filteredDeals`, `filteredSalaries` e `kpis` usam `getPaymentDateInfo(baseDate).monthKey.startsWith(selectedYear)` em vez de `new Date(baseDate).getFullYear()`.
+
+### ✅ RESOLVIDO — KPIs do Financeiro ignoravam filtros de operação/funcionário
+**Arquivo:** `src/pages/Financeiro.tsx`
+**Fix:** `kpis` itera `filteredDeals` (que já tem todos os filtros aplicados) em vez de `activeDeals`. `futureProjections` aplica `filtroOperacao` além de `filtroFuncionario`.
+
+---
+
+## IDs dos Usuários de Teste
+
+| Usuário | UUID | Position |
+|---------|------|----------|
+| diretor@teste.com | `231bc367-5a92-4ca6-83c2-f102f018b2df` | Diretor |
+| executivo@teste.com | `c2408175-543a-4d43-a417-5f36d98dd7f6` | Executivo de Negócios |
+| sdr@teste.com | `c5342fdf-c6fd-444f-9ad8-9019c5a774f5` | SDR |
+
+**Seed de dados:** botão "POPULAR BANCO (TESTE)" em Settings → visível apenas para Diretor. Limpa e reinserere deals (→ EXECUTIVO_ID) e apresentações (→ SDR_ID) com `is_test_data = true`.
 
 ---
 
