@@ -57,14 +57,18 @@ export async function fetchDeals(role: UserRole, userId?: string, position?: str
   console.log(`[fetchDeals] Buscando dados para ambiente: ${isTestEnv ? "TESTE 🧪" : "PRODUÇÃO 🚀"} (User: ${user?.email}, Role: ${role}, Position: ${position})`);
 
   // Pré-buscar UUIDs de executivos se o usuário for SDR
+  // Nota: profiles NÃO tem coluna is_test_data — é dado global compartilhado
   let executivoIds: string[] = [];
   if (position === "SDR") {
-    const { data: executivos } = await (supabase as any)
+    const { data: executivos, error: execErr } = await (supabase as any)
       .from("profiles")
       .select("user_id")
-      .eq("position", "Executivo de Negócios")
-      .eq("is_test_data", isTestEnv);
+      .eq("position", "Executivo de Negócios");
+    if (execErr) {
+      console.error("[fetchDeals] Erro ao buscar executivos para SDR:", execErr.message);
+    }
     executivoIds = (executivos || []).map((p: any) => p.user_id);
+    console.log(`[fetchDeals] Executivos encontrados para SDR: ${executivoIds.length}`, executivoIds);
   }
 
   let query = (supabase as any)
@@ -115,7 +119,8 @@ export async function upsertDeal(deal: Deal): Promise<Deal> {
     ...dealToDb(deal),
     is_test_data: isTestEnv,
     // Garante user_id: usa o do deal (Diretor pode atribuir a Executivo) ou o usuário atual
-    user_id: deal.userId || user?.id,
+    // ?? em vez de || para não substituir string vazia acidentalmente
+    user_id: deal.userId ?? user?.id,
   };
   const { data, error } = await (supabase as any).from("deals").upsert(payload).select().single();
 
