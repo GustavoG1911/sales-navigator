@@ -57,18 +57,19 @@ export async function fetchDeals(role: UserRole, userId?: string, position?: str
   console.log(`[fetchDeals] Buscando dados para ambiente: ${isTestEnv ? "TESTE 🧪" : "PRODUÇÃO 🚀"} (User: ${user?.email}, Role: ${role}, Position: ${position})`);
 
   // Pré-buscar UUIDs de executivos se o usuário for SDR
-  // Nota: profiles NÃO tem coluna is_test_data — é dado global compartilhado
+  // profiles tem is_test_data → filtra pelo mesmo ambiente do SDR para não cruzar prod/teste
   let executivoIds: string[] = [];
   if (position === "SDR") {
     const { data: executivos, error: execErr } = await (supabase as any)
       .from("profiles")
       .select("user_id")
-      .eq("position", "Executivo de Negócios");
+      .eq("position", "Executivo de Negócios")
+      .eq("is_test_data", isTestEnv);
     if (execErr) {
       console.error("[fetchDeals] Erro ao buscar executivos para SDR:", execErr.message);
     }
     executivoIds = (executivos || []).map((p: any) => p.user_id);
-    console.log(`[fetchDeals] Executivos encontrados para SDR: ${executivoIds.length}`, executivoIds);
+    console.log(`[fetchDeals] SDR — executivos encontrados (is_test_data=${isTestEnv}): ${executivoIds.length}`, executivoIds);
   }
 
   let query = (supabase as any)

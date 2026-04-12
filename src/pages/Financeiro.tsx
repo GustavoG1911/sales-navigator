@@ -420,8 +420,14 @@ function FinanceiroContent() {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const isTestEnv = currentUser?.email?.endsWith("@teste.com") || false;
 
-      // profiles é dado global — sem filtro is_test_data (a coluna não existe em profiles)
-      const profilesRes = await (supabase.from("profiles") as any).select("user_id, full_name, display_name, commission_percent, fixed_salary");
+      // profiles filtrado por is_test_data para isolamento test/prod
+      let profilesRes = await (supabase.from("profiles") as any)
+        .select("user_id, full_name, display_name, commission_percent, fixed_salary")
+        .eq("is_test_data", isTestEnv);
+      if (profilesRes.error && (profilesRes.error.message?.includes("is_test_data") || profilesRes.error.message?.includes("column"))) {
+        profilesRes = await (supabase.from("profiles") as any)
+          .select("user_id, full_name, display_name, commission_percent, fixed_salary");
+      }
       const salariesRes = await (supabase.from("salary_payments") as any).select("*");
 
       if (profilesRes.error) throw profilesRes.error;
