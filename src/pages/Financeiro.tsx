@@ -420,13 +420,9 @@ function FinanceiroContent() {
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const isTestEnv = currentUser?.email?.endsWith("@teste.com") || false;
 
-      let profilesRes = await (supabase.from("profiles") as any).select("user_id, full_name, display_name, commission_percent, fixed_salary").eq("is_test_data", isTestEnv);
+      // profiles é dado global — sem filtro is_test_data (a coluna não existe em profiles)
+      const profilesRes = await (supabase.from("profiles") as any).select("user_id, full_name, display_name, commission_percent, fixed_salary");
       const salariesRes = await (supabase.from("salary_payments") as any).select("*");
-
-      if (profilesRes.error && (profilesRes.error.message.includes('is_test_data') || profilesRes.error.message.includes('column'))) {
-        console.warn("[Financeiro] Fallback de perfis executado.");
-        profilesRes = await (supabase.from("profiles") as any).select("user_id, full_name, display_name, commission_percent, fixed_salary");
-      }
 
       if (profilesRes.error) throw profilesRes.error;
       if (salariesRes.error) throw salariesRes.error;

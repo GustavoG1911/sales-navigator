@@ -62,8 +62,10 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal, currentPo
       setMonthlyValue("");
       setImplantationValue("");
 
+      // Dia 1 do próximo mês: ≤ 7, então conta no próprio mês (sem transbordo pela Regra do Dia 07)
       const defaultPayDate = new Date();
-      defaultPayDate.setDate(defaultPayDate.getDate() + 30);
+      defaultPayDate.setMonth(defaultPayDate.getMonth() + 1);
+      defaultPayDate.setDate(1);
       setFirstPaymentDate(defaultPayDate);
       setImplantationPaymentDate(defaultPayDate);
 
@@ -89,8 +91,10 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal, currentPo
 
   useEffect(() => {
     if (!editDeal && closingDate && !firstPaymentDate) {
+      // Dia 1 do mês seguinte ao fechamento — ≤ 7, sem transbordo pela Regra do Dia 07
       const d = new Date(closingDate);
-      d.setDate(d.getDate() + 30);
+      d.setMonth(d.getMonth() + 1);
+      d.setDate(1);
       setFirstPaymentDate(d);
       setImplantationPaymentDate(d);
     }
