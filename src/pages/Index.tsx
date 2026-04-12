@@ -111,7 +111,7 @@ export default function Index() {
 
   const financialDeals = useMemo(
     () => deals.filter((d) => {
-      const baseDate = d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
+      const baseDate = d.actualPaymentDate || d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
       const { monthKey } = getPaymentDateInfo(baseDate);
 
       let passDate: boolean;

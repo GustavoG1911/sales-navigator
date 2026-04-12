@@ -459,9 +459,7 @@ function FinanceiroContent() {
   const filteredDeals = useMemo(() => {
     return activeDeals.filter((d) => {
       // Time filtering based on filterType
-      const baseDate = d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
-      const dateObj = new Date(baseDate);
-      
+      const baseDate = d.actualPaymentDate || d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
       const { monthKey: dealMonthKey } = getPaymentDateInfo(baseDate);
       let passTime = false;
       if (filterType === "month") {
@@ -537,10 +535,10 @@ function FinanceiroContent() {
       if (filtroOperacao !== "Todas" && deal.operation !== filtroOperacao) return;
       if (filtroFuncionario !== "Todos" && deal.userId !== filtroFuncionario) return;
 
-      const baseDate = deal.firstPaymentDate || deal.implantationPaymentDate;
+      const baseDate = deal.actualPaymentDate || deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
       if (!baseDate) return;
       const { monthKey } = getPaymentDateInfo(baseDate);
-      
+
       const isFuture = filterType === "month" 
         ? monthKey > selectedMonth 
         : monthKey.split("-")[0] > selectedYear;
@@ -624,10 +622,11 @@ function FinanceiroContent() {
     }
     const { error } = await supabase
       .from("deals")
-      .update({ 
+      .update({
         is_paid_to_user: newStatus,
-        user_payment_date: newStatus ? (specificDate || new Date().toISOString()) : null,
-        actual_payment_date: newStatus ? (specificDate || new Date().toISOString()) : null
+        actual_payment_date: newStatus
+          ? (specificDate || new Date().toISOString().split("T")[0])
+          : null,
       } as any)
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }

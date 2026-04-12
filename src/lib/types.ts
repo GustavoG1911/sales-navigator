@@ -29,6 +29,7 @@ export interface Deal {
   isTestData?: boolean;
   isImplantacaoPaid?: boolean;
   isMensalidadePaid?: boolean;
+  actualPaymentDate?: string;
 }
 
 export interface OperationPresentations {

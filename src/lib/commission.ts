@@ -70,7 +70,7 @@ export function getPresentationsForDeal(
   deal: Deal,
   presentations: MonthlyPresentations
 ): number {
-  const baseDate = deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
+  const baseDate = deal.actualPaymentDate || deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
   const { monthKey } = getPaymentDateInfo(baseDate);
   const monthData = presentations[monthKey] || { bluepex: 0, opus: 0 };
   return deal.operation === "BluePex" ? monthData.bluepex : monthData.opus;
