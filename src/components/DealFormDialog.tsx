@@ -19,14 +19,18 @@ interface DealFormDialogProps {
   onOpenChange: (open: boolean) => void;
   onSave: (deal: Deal) => void;
   editDeal?: Deal | null;
+  currentPosition?: string;
+  currentUserId?: string;
+  executivos?: { id: string; name: string }[];
 }
 
 function genId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFormDialogProps) {
+export function DealFormDialog({ open, onOpenChange, onSave, editDeal, currentPosition, currentUserId, executivos }: DealFormDialogProps) {
   const [closingDate, setClosingDate] = useState<Date | undefined>();
+  const [selectedExecutivoId, setSelectedExecutivoId] = useState("");
   const [operation, setOperation] = useState<Operation>("BluePex");
   const [clientName, setClientName] = useState("");
   const [monthlyValue, setMonthlyValue] = useState("");
@@ -57,18 +61,22 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
       setClientName("");
       setMonthlyValue("");
       setImplantationValue("");
-      
+
       const defaultPayDate = new Date();
       defaultPayDate.setDate(defaultPayDate.getDate() + 30);
       setFirstPaymentDate(defaultPayDate);
       setImplantationPaymentDate(defaultPayDate);
-      
+
       setIsInstallment(false);
       setInstallmentCount("2");
       setInstallmentDates([]);
       setPaymentStatus("Pendente");
+
+      if (currentPosition === "Diretor" && executivos?.length) {
+        setSelectedExecutivoId(executivos[0].id);
+      }
     }
-  }, [editDeal, open]);
+  }, [editDeal, open, currentPosition, executivos]);
 
   useEffect(() => {
     const count = parseInt(installmentCount) || 2;
@@ -89,6 +97,10 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
   }, [closingDate, editDeal, firstPaymentDate]);
 
   const handleSave = () => {
+    if (currentPosition === "SDR") {
+      toast.error("SDR não pode registrar fechamentos.");
+      return;
+    }
     if (!closingDate || !clientName.trim()) {
       toast.error("Preencha a data de fechamento e o nome da empresa.");
       return;
@@ -96,6 +108,13 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
     if (!firstPaymentDate || !implantationPaymentDate) {
       toast.error("O preenchimento da Data do Primeiro Pagamento e Data de Implantação é OBRIGATÓRIO.");
       return;
+    }
+
+    let dealUserId: string | undefined;
+    if (currentPosition === "Diretor") {
+      dealUserId = selectedExecutivoId || undefined;
+    } else {
+      dealUserId = editDeal?.userId || currentUserId;
     }
 
     const deal: Deal = {
@@ -113,6 +132,7 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
         ? installmentDates.map((d) => ({ date: d?.toISOString() || "" }))
         : [],
       paymentStatus,
+      userId: dealUserId,
     };
     onSave(deal);
     onOpenChange(false);
@@ -143,6 +163,21 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal }: DealFor
               </SelectContent>
             </Select>
           </div>
+
+          {/* Executivo picker — apenas para Diretor em novo fechamento */}
+          {currentPosition === "Diretor" && !editDeal && executivos && executivos.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>Executivo Responsável</Label>
+              <Select value={selectedExecutivoId} onValueChange={setSelectedExecutivoId}>
+                <SelectTrigger><SelectValue placeholder="Selecione o executivo" /></SelectTrigger>
+                <SelectContent>
+                  {executivos.map(e => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Client */}
           <div className="space-y-1.5">

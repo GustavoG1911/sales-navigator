@@ -174,14 +174,16 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                         </TableCell>
                       )}
                       <TableCell className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-0.5">
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(deal)}>
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(deal.id)}>
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
+                        {position !== "SDR" && (
+                          <div className="flex gap-0.5">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(deal)}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(deal.id)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                     {isExpanded && (

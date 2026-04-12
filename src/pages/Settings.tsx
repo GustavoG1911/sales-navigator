@@ -12,26 +12,39 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Users, Save, Shield, UserCog, User, Loader2, SlidersHorizontal, FlaskConical } from "lucide-react";
+import { Users, Save, Shield, UserCog, User, Loader2, SlidersHorizontal, FlaskConical, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { useAppData } from "@/hooks/useAppData";
-import { seedHistoricalData } from "@/lib/seed-test-data";
+import { seedHistoricalData, clearTestData } from "@/lib/seed-test-data";
 
 export default function Settings() {
   const { role, user, loading: authLoading, position } = useAuth();
   const { settings, updateSettings } = useAppData(role, user?.id, position);
   const [seeding, setSeeding] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const handleSeed = async () => {
     setSeeding(true);
     try {
       await seedHistoricalData();
       toast.success("Banco de teste populado com sucesso!");
-    } catch (err: any) {
-      toast.error("Erro ao popular banco: " + err.message);
+    } catch (err: unknown) {
+      toast.error("Erro ao popular banco: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setSeeding(false);
+    }
+  };
+
+  const handleClear = async () => {
+    setClearing(true);
+    try {
+      await clearTestData();
+      toast.success("Todos os dados de teste foram removidos.");
+    } catch (err: unknown) {
+      toast.error("Erro ao limpar: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -80,18 +93,36 @@ export default function Settings() {
       {position === "Diretor" && (
         <div className="mt-8 pt-6 border-t border-border/40">
           <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide font-medium">Ambiente de Teste</p>
-          <Button
-            variant="destructive"
-            onClick={handleSeed}
-            disabled={seeding}
-            className="gap-2"
-          >
-            {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-            {seeding ? "Populando banco..." : "POPULAR BANCO (TESTE)"}
-          </Button>
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Limpa e reinserere dados de teste realistas (deals + apresentações). Não afeta perfis.
-          </p>
+          <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col gap-1">
+              <Button
+                variant="outline"
+                onClick={handleClear}
+                disabled={clearing || seeding}
+                className="gap-2 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              >
+                {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {clearing ? "Limpando..." : "LIMPAR TODOS OS DADOS"}
+              </Button>
+              <p className="text-[11px] text-muted-foreground">
+                Remove todos os deals e apresentações de teste. Não afeta perfis.
+              </p>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Button
+                variant="destructive"
+                onClick={handleSeed}
+                disabled={seeding || clearing}
+                className="gap-2"
+              >
+                {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
+                {seeding ? "Populando banco..." : "POPULAR BANCO (TESTE)"}
+              </Button>
+              <p className="text-[11px] text-muted-foreground">
+                Limpa e reinserere dados de teste realistas (deals + apresentações). Não afeta perfis.
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>

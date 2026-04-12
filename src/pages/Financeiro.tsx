@@ -167,7 +167,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
   const querySalaries = data?.salaries || [];
   const profiles = data?.profiles || {};
 
-  const activeDeals = deals.filter(d => d.userId === user?.id);
+  const activeDeals = deals; // fetchDeals já filtra por position (SDR vê Executivos, Executivo vê próprios)
   const activeSalaries = querySalaries.length > 0 ? querySalaries : [];
 
   const filteredDeals = useMemo(() => {

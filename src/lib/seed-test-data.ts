@@ -219,6 +219,24 @@ function buildPresentations(): SeedPresentation[] {
 }
 
 // ═══════════════════════════════════════════════════════════
+// 🗑️ LIMPEZA — Apaga todos os dados de teste sem re-inserir
+// ═══════════════════════════════════════════════════════════
+
+export async function clearTestData() {
+  const { error: delDealsErr } = await (supabase as any)
+    .from("deals")
+    .delete()
+    .eq("is_test_data", true);
+  if (delDealsErr) throw new Error("Erro ao limpar deals: " + delDealsErr.message);
+
+  const { error: delPresErr } = await (supabase as any)
+    .from("presentations")
+    .delete()
+    .eq("is_test_data", true);
+  if (delPresErr) throw new Error("Erro ao limpar apresentações: " + delPresErr.message);
+}
+
+// ═══════════════════════════════════════════════════════════
 // 🚀 EXECUÇÃO
 // ═══════════════════════════════════════════════════════════
 

@@ -51,6 +51,7 @@ export default function Index() {
   const [kpiModalType, setKpiModalType] = useState<"projected" | "paid" | "deals" | null>(null);
   const [filtroOperacao, setFiltroOperacao] = useState("Todas");
   const [profiles, setProfiles] = useState<any>({});
+  const [executivos, setExecutivos] = useState<{id: string, name: string}[]>([]);
 
   const periodSuffix = periodType === "month" ? "do Mês" : periodType === "quarter" ? "do Trimestre" : periodType === "year" ? "do Ano" : "do Período";
 
@@ -73,11 +74,16 @@ export default function Index() {
 
   useEffect(() => {
     if (position === "Diretor") {
-      supabase.from("profiles").select("user_id, full_name").then(({ data }) => {
+      (supabase as any).from("profiles").select("user_id, full_name, position").then(({ data }: { data: any[] | null }) => {
         if (data) {
           const map: any = {};
           data.forEach(p => map[p.user_id] = p.full_name);
           setProfiles(map);
+          setExecutivos(
+            data
+              .filter(p => p.position === "Executivo de Negócios")
+              .map(p => ({ id: p.user_id, name: p.full_name }))
+          );
         }
       });
     }
@@ -122,7 +128,7 @@ export default function Index() {
         const passUser = filtroFuncionario === "Todos" || d.userId === filtroFuncionario;
         return passDate && passOp && passUser;
       }
-      return passDate && d.userId === user?.id;
+      return passDate; // fetchDeals já filtra por position (SDR vê Executivos, Executivo vê próprios)
     }),
     [deals, selectedMonthKey, isSingleMonth, dateRange, isDirector, filtroOperacao, filtroFuncionario, user?.id]
   );
@@ -340,10 +346,12 @@ export default function Index() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button onClick={handleNewDeal} size="sm" className="h-9 text-xs">
-            <Plus className="h-3.5 w-3.5 mr-1" />
-            Novo Fechamento
-          </Button>
+          {position !== "SDR" && (
+            <Button onClick={handleNewDeal} size="sm" className="h-9 text-xs">
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Novo Fechamento
+            </Button>
+          )}
           <Button onClick={handleDownloadReport} size="sm" variant="outline" className="h-9 text-xs">
             <FileDown className="h-3.5 w-3.5 mr-1" />
             PDF
@@ -537,6 +545,9 @@ export default function Index() {
         onOpenChange={setFormOpen}
         onSave={addOrUpdateDeal}
         editDeal={editingDeal}
+        currentPosition={position}
+        currentUserId={user?.id}
+        executivos={executivos}
       />
     </div>
   );
