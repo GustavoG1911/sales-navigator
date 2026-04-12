@@ -304,241 +304,214 @@ export default function Index() {
   };
 
   return (
-    <div className="container py-5">
-      <div className="mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-4 w-full md:w-auto">
-          
-          {position === "Diretor" && (
-            <Card className="bg-muted/30">
-              <CardContent className="p-4 flex flex-wrap items-center gap-4">
-                <PeriodFilter onPeriodChange={handlePeriodChange} availableYears={availableYears} />
-                <Select value={filtroOperacao} onValueChange={setFiltroOperacao}>
-                  <SelectTrigger className="w-[140px] md:w-[160px] h-9 text-xs font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                    <SelectValue placeholder="Operação" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Todas">Todas Operações</SelectItem>
-                    <SelectItem value="BluePex">BluePex</SelectItem>
-                    <SelectItem value="Opus Tech">Opus Tech</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={filtroFuncionario} onValueChange={setFiltroFuncionario}>
-                  <SelectTrigger className="w-[140px] md:w-[160px] h-9 text-xs font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-                    <SelectValue placeholder="Funcionário" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Todos">Todos Funcionários</SelectItem>
-                    {Object.entries(profiles).map(([id, name]) => (
-                      <SelectItem key={id} value={id}>{name as string}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-          )}
-
-          {position !== "Diretor" && (
-            <div className="flex items-center">
-              <PeriodFilter onPeriodChange={handlePeriodChange} />
-            </div>
-          )}
+    <div className="px-5 py-5 max-w-[1400px] mx-auto">
+      {/* ── Page header ── */}
+      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-bold text-foreground tracking-tight">Dashboard de Vendas</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">{periodLabel} · {filteredDeals.length} fechamento(s)</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {position !== "SDR" && (
-            <Button onClick={handleNewDeal} size="sm" className="h-9 text-xs">
-              <Plus className="h-3.5 w-3.5 mr-1" />
+            <Button onClick={handleNewDeal} size="sm" className="h-9 text-xs gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
+              <Plus className="h-3.5 w-3.5" />
               Novo Fechamento
             </Button>
           )}
-          <Button onClick={handleDownloadReport} size="sm" variant="outline" className="h-9 text-xs">
-            <FileDown className="h-3.5 w-3.5 mr-1" />
+          <Button onClick={handleDownloadReport} size="sm" variant="outline" className="h-9 text-xs gap-1.5 border-border/60 hover:bg-muted/60">
+            <FileDown className="h-3.5 w-3.5" />
             PDF
           </Button>
-          <Button onClick={handlePrintReport} size="sm" variant="ghost" className="h-9 w-9 p-0">
+          <Button onClick={handlePrintReport} size="sm" variant="ghost" className="h-9 w-9 p-0 hover:bg-muted/60">
             <Printer className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="dashboard">
-        <TabsList className="h-9 mb-5">
-          <TabsTrigger value="dashboard" className="text-xs gap-1.5">
-            <BarChart3 className="h-3.5 w-3.5" />
-            Dashboard de Vendas
-          </TabsTrigger>
-        </TabsList>
+      {/* ── Filters bar ── */}
+      <div className="mb-6 bg-card/60 rounded-xl border border-border/50 px-4 py-3 flex flex-wrap items-center gap-3">
+        <PeriodFilter onPeriodChange={handlePeriodChange} availableYears={availableYears} />
 
-        <TabsContent value="dashboard" className="space-y-5 mt-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h2 className="text-sm font-semibold text-foreground">{periodLabel}</h2>
-              <span className="text-xs text-muted-foreground">{filteredDeals.length} fechamento(s)</span>
-            </div>
-          </div>
+        {position === "Diretor" && (
+          <>
+            <div className="h-5 w-px bg-border/60 hidden sm:block" />
+            <Select value={filtroOperacao} onValueChange={setFiltroOperacao}>
+              <SelectTrigger className="w-[150px] h-8 text-xs bg-muted/30 border-border/40">
+                <SelectValue placeholder="Operação" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todas">Todas Operações</SelectItem>
+                <SelectItem value="BluePex">BluePex</SelectItem>
+                <SelectItem value="Opus Tech">Opus Tech</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filtroFuncionario} onValueChange={setFiltroFuncionario}>
+              <SelectTrigger className="w-[160px] h-8 text-xs bg-muted/30 border-border/40">
+                <SelectValue placeholder="Funcionário" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Todos">Todos Funcionários</SelectItem>
+                {Object.entries(profiles).map(([id, name]) => (
+                  <SelectItem key={id} value={id}>{name as string}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
+      </div>
 
-          {isSingleMonth && (
-            <div className="my-6">
-              <PresentationsCard
-                presentations={currentMonthPres}
-                onUpdate={(op, count) => {
-                  setOptimisticPresentations(prev => ({
-                    ...prev,
-                    [selectedMonthKey]: {
-                      ...(prev[selectedMonthKey] || { bluepex: 0, opus: 0 }),
-                      [op]: count,
-                    },
-                  }));
-                  updatePresentations(selectedMonthKey, op, count);
-                }}
-                settings={settings}
-              />
-            </div>
-          )}
+      {/* ── LINHA 1: KPI cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {kpis.map((kpi, idx) => (
+          <KpiCard
+            key={idx}
+            title={kpi.title}
+            value={kpi.type === "currency" ? formatCurrency(kpi.value) : kpi.value.toString()}
+            icon={kpi.icon}
+            variant={kpi.variant}
+            onClick={kpi.modalType ? () => setKpiModalType(kpi.modalType) : undefined}
+          />
+        ))}
+      </div>
 
-          <div>
-            <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-widest font-semibold flex items-center gap-2">
-              KPIs de Performance {periodSuffix}
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {kpis.map((kpi, idx) => (
-                <KpiCard 
-                  key={idx}
-                  title={kpi.title}
-                  value={kpi.type === "currency" ? formatCurrency(kpi.value) : kpi.value.toString()}
-                  icon={kpi.icon}
-                  variant={kpi.variant}
-                  onClick={kpi.modalType ? () => setKpiModalType(kpi.modalType) : undefined}
-                />
-              ))}
-            </div>
-          </div>
-
-          <Dialog open={!!kpiModalType} onOpenChange={(open) => !open && setKpiModalType(null)}>
-            <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
-              <DialogHeader>
-                <DialogTitle>{kpiModalType ? kpiModalTitles[kpiModalType] : ""}</DialogTitle>
-                <DialogDescription>
-                  Listagem detalhada dos negócios que compõem este KPI.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Data</TableHead>
-                      <TableHead className="text-xs">Cliente</TableHead>
-                      <TableHead className="text-xs">Operação</TableHead>
-                      <TableHead className="text-xs text-right">Mensal</TableHead>
-                      <TableHead className="text-xs text-right">Implantação</TableHead>
+      {/* KPI detail modal */}
+      <Dialog open={!!kpiModalType} onOpenChange={(open) => !open && setKpiModalType(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{kpiModalType ? kpiModalTitles[kpiModalType] : ""}</DialogTitle>
+            <DialogDescription>Listagem detalhada dos negócios que compõem este KPI.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Data</TableHead>
+                  <TableHead className="text-xs">Cliente</TableHead>
+                  <TableHead className="text-xs">Operação</TableHead>
+                  <TableHead className="text-xs text-right">Mensal</TableHead>
+                  <TableHead className="text-xs text-right">Implantação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detailDeals.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center text-xs py-8 text-muted-foreground">Nenhum registro encontrado.</TableCell></TableRow>
+                ) : (
+                  detailDeals.map(d => (
+                    <TableRow key={d.id}>
+                      <TableCell className="text-xs text-muted-foreground">{format(new Date(d.closingDate), "dd/MM/yyyy")}</TableCell>
+                      <TableCell className="text-xs font-medium">{d.clientName}</TableCell>
+                      <TableCell className="text-xs">{d.operation}</TableCell>
+                      <TableCell className="text-xs font-mono text-right">{formatCurrency(d.monthlyValue)}</TableCell>
+                      <TableCell className="text-xs font-mono text-right">{formatCurrency(d.implantationValue)}</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {detailDeals.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center text-xs py-8">Nenhum registro encontrado.</TableCell></TableRow>
-                    ) : (
-                      detailDeals.map(d => (
-                        <TableRow key={d.id}>
-                          <TableCell className="text-xs text-muted-foreground">{format(new Date(d.closingDate), "dd/MM/yyyy")}</TableCell>
-                          <TableCell className="text-xs font-medium">{d.clientName}</TableCell>
-                          <TableCell className="text-xs">{d.operation}</TableCell>
-                          <TableCell className="text-xs font-mono text-right">{formatCurrency(d.monthlyValue)}</TableCell>
-                          <TableCell className="text-xs font-mono text-right">{formatCurrency(d.implantationValue)}</TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
-            {/* Volume Chart */}
-            <Card className="h-[300px] flex flex-col bg-card/60">
-              <CardContent className="flex-1 p-4 flex flex-col">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-4">
-                  Volume Bruto por Operação
-                </span>
-                <div className="flex-1 w-full relative min-h-[200px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={volumeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#888' }} />
-                      <YAxis tickFormatter={(val) => `R$${(val/1000)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#888' }} />
-                      <RechartsTooltip 
-                        formatter={(value: number) => formatCurrency(value)}
-                        contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
-                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                      />
-                      {isSingleMonth ? (
-                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                          {volumeChartData.map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Bar>
-                      ) : (
-                        <>
-                          <Bar dataKey="BluePex" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="Opus Tech" fill="#10b981" radius={[4, 4, 0, 0]} />
-                        </>
-                      )}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Presentations Chart */}
-            <Card className="h-[300px] flex flex-col bg-card/60">
-              <CardContent className="flex-1 p-4 flex flex-col">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-4">
-                  Apresentações Realizadas {isSingleMonth ? periodSuffix : ""}
-                </span>
-                <div className="flex-1 w-full relative min-h-[200px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={presChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#888' }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#888' }} />
-                      <RechartsTooltip 
-                        formatter={(value: number) => [`${value} APs`, "Apresentações"]}
-                        contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
-                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                      />
-                      {isSingleMonth ? (
-                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                          {presChartData.map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Bar>
-                      ) : (
-                        <>
-                          <Bar dataKey="BluePex" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="Opus Tech" fill="#10b981" radius={[4, 4, 0, 0]} />
-                        </>
-                      )}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          <div id="deals-table-container">
-            <DealsTable
-              deals={filteredDeals}
-              presentations={optimisticPresentations}
-              settings={settings}
-              superMetaActive={false}
-              onEdit={handleEdit}
-              onDelete={removeDeal}
-              onStatusChange={handleStatusChange}
-            />
+      {/* ── LINHA 2: Apresentações (apenas modo mês) ── */}
+      {isSingleMonth && (
+        <div className="mb-6">
+          <PresentationsCard
+            presentations={currentMonthPres}
+            onUpdate={(op, count) => {
+              setOptimisticPresentations(prev => ({
+                ...prev,
+                [selectedMonthKey]: {
+                  ...(prev[selectedMonthKey] || { bluepex: 0, opus: 0 }),
+                  [op]: count,
+                },
+              }));
+              updatePresentations(selectedMonthKey, op, count);
+            }}
+            settings={settings}
+          />
+        </div>
+      )}
+
+      {/* ── LINHA 3: Gráficos ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* Volume Chart */}
+        <div className="bg-card rounded-xl border border-border/60 p-5 h-[300px] flex flex-col">
+          <span className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground mb-4">
+            Volume Bruto por Operação
+          </span>
+          <div className="flex-1 min-h-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={volumeChartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#8B92A9' }} />
+                <YAxis tickFormatter={(val) => `${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#8B92A9' }} />
+                <RechartsTooltip
+                  formatter={(value: number) => formatCurrency(value)}
+                  contentStyle={{ backgroundColor: '#1A1D2E', border: '1px solid #2D3154', borderRadius: '10px', color: '#F0F2F8', fontSize: '11px' }}
+                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                />
+                {isSingleMonth ? (
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    {volumeChartData.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                ) : (
+                  <>
+                    <Bar dataKey="BluePex" fill="#4F8EF7" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Opus Tech" fill="#00D084" radius={[4, 4, 0, 0]} />
+                  </>
+                )}
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+
+        {/* Presentations Chart */}
+        <div className="bg-card rounded-xl border border-border/60 p-5 h-[300px] flex flex-col">
+          <span className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground mb-4">
+            Apresentações Realizadas {isSingleMonth ? periodSuffix : ""}
+          </span>
+          <div className="flex-1 min-h-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={presChartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#8B92A9' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#8B92A9' }} />
+                <RechartsTooltip
+                  formatter={(value: number) => [`${value} APs`, "Apresentações"]}
+                  contentStyle={{ backgroundColor: '#1A1D2E', border: '1px solid #2D3154', borderRadius: '10px', color: '#F0F2F8', fontSize: '11px' }}
+                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                />
+                {isSingleMonth ? (
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    {presChartData.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                ) : (
+                  <>
+                    <Bar dataKey="BluePex" fill="#4F8EF7" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Opus Tech" fill="#00D084" radius={[4, 4, 0, 0]} />
+                  </>
+                )}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* ── LINHA 4: Tabela de deals ── */}
+      <DealsTable
+        deals={filteredDeals}
+        presentations={optimisticPresentations}
+        settings={settings}
+        superMetaActive={false}
+        onEdit={handleEdit}
+        onDelete={removeDeal}
+        onStatusChange={handleStatusChange}
+      />
 
       <DealFormDialog
         open={formOpen}

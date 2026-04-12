@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -57,20 +56,23 @@ export default function Settings() {
   }
 
   return (
-    <div className="container py-5">
-      <h2 className="text-lg font-semibold mb-4">Configurações</h2>
+    <div className="container py-6">
+      <div className="mb-6">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">Configurações</h1>
+        <p className="text-xs text-muted-foreground/60 mt-0.5">Perfil, metas e gestão de equipe</p>
+      </div>
       <Tabs defaultValue="profile">
-        <TabsList className="h-9 mb-5">
-          <TabsTrigger value="profile" className="text-xs gap-1.5">
+        <TabsList className="h-9 mb-6 bg-muted/40 border border-border/40">
+          <TabsTrigger value="profile" className="text-xs gap-1.5 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm">
             <User className="h-3.5 w-3.5" />
             Meu Perfil
           </TabsTrigger>
-          <TabsTrigger value="comissions" className="text-xs gap-1.5">
+          <TabsTrigger value="comissions" className="text-xs gap-1.5 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm">
             <SlidersHorizontal className="h-3.5 w-3.5" />
             Metas e Comissões
           </TabsTrigger>
           {role === "admin" && (
-            <TabsTrigger value="team" className="flex items-center gap-2">
+            <TabsTrigger value="team" className="text-xs gap-1.5 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm">
               <Users className="h-3.5 w-3.5" />
               <span>Gestão de Equipe</span>
             </TabsTrigger>
@@ -91,24 +93,24 @@ export default function Settings() {
       </Tabs>
 
       {position === "Diretor" && (
-        <div className="mt-8 pt-6 border-t border-border/40">
-          <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide font-medium">Ambiente de Teste</p>
-          <div className="flex flex-wrap gap-3">
-            <div className="flex flex-col gap-1">
+        <div className="mt-8 bg-card rounded-xl border border-border/60 p-5">
+          <p className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground mb-4">Ambiente de Teste</p>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col gap-1.5">
               <Button
                 variant="outline"
                 onClick={handleClear}
                 disabled={clearing || seeding}
-                className="gap-2 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                className="gap-2 border-destructive/40 text-destructive hover:bg-destructive/10 hover:border-destructive"
               >
                 {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                {clearing ? "Limpando..." : "LIMPAR TODOS OS DADOS"}
+                {clearing ? "Limpando..." : "Limpar Todos os Dados"}
               </Button>
-              <p className="text-[11px] text-muted-foreground">
-                Remove todos os deals e apresentações de teste. Não afeta perfis.
+              <p className="text-[11px] text-muted-foreground/60">
+                Remove todos os deals e apresentações de teste.
               </p>
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5">
               <Button
                 variant="destructive"
                 onClick={handleSeed}
@@ -116,10 +118,10 @@ export default function Settings() {
                 className="gap-2"
               >
                 {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-                {seeding ? "Populando banco..." : "POPULAR BANCO (TESTE)"}
+                {seeding ? "Populando banco..." : "Popular Banco (Teste)"}
               </Button>
-              <p className="text-[11px] text-muted-foreground">
-                Limpa e reinserere dados de teste realistas (deals + apresentações). Não afeta perfis.
+              <p className="text-[11px] text-muted-foreground/60">
+                Reinserere dados de teste realistas (deals + apresentações).
               </p>
             </div>
           </div>
@@ -192,66 +194,61 @@ function ProfileTab() {
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
   return (
-    <Card className="max-w-lg">
-      <CardHeader>
-        <CardTitle className="text-sm flex items-center gap-2">
+    <div className="max-w-lg bg-card rounded-xl border border-border/60 p-5 space-y-5">
+      <div className="flex items-center gap-2 pb-3 border-b border-border/40">
+        <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
           <User className="h-4 w-4 text-primary" />
-          Meu Perfil
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        </div>
+        <span className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">Meu Perfil</span>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground uppercase tracking-wide">Nome Completo *</Label>
+        <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="bg-muted/30 border-border/50" />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground uppercase tracking-wide">Cargo Descritivo *</Label>
+        <Input value={form.job_title} onChange={(e) => setForm({ ...form, job_title: e.target.value })} className="bg-muted/30 border-border/50" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs">Nome Completo *</Label>
-          <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+          <Label className="text-xs text-muted-foreground uppercase tracking-wide">Nível de Sistema</Label>
+          <Select
+            value={form.role}
+            onValueChange={(val) => setForm({ ...form, role: val })}
+            disabled={currentUserRole !== "admin"}
+          >
+            <SelectTrigger className="bg-muted/30 border-border/50">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="gestor">Gestor</SelectItem>
+              <SelectItem value="user">User</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Cargo *</Label>
-          <Input value={form.job_title} onChange={(e) => setForm({ ...form, job_title: e.target.value })} />
+          <Label className="text-xs text-muted-foreground uppercase tracking-wide">Função na Empresa</Label>
+          <Select
+            value={["SDR", "Executivo de Negócios", "Diretor"].includes(form.position) ? form.position : ""}
+            onValueChange={(val) => setForm({ ...form, position: val })}
+          >
+            <SelectTrigger className="bg-muted/30 border-border/50">
+              <SelectValue placeholder="Selecione..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="SDR">SDR</SelectItem>
+              <SelectItem value="Executivo de Negócios">Executivo de Negócios</SelectItem>
+              <SelectItem value="Diretor">Diretor</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Nível de Sistema</Label>
-            <Select 
-              value={form.role} 
-              onValueChange={(val) => setForm({ ...form, role: val })} 
-              disabled={currentUserRole !== "admin"}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="gestor">Gestor</SelectItem>
-                <SelectItem value="user">User</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Função na Empresa</Label>
-            <div className="flex gap-2">
-              <Select 
-                value={["SDR", "Executivo de Negócios", "Diretor"].includes(form.position) ? form.position : ""} 
-                onValueChange={(val) => setForm({ ...form, position: val })}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SDR">SDR</SelectItem>
-                  <SelectItem value="Executivo de Negócios">Executivo de Negócios</SelectItem>
-                  <SelectItem value="Diretor">Diretor</SelectItem>
-                </SelectContent>
-              </Select>
-              {/* Optional fallback if they type something completely custom: it could just be a select or an input. The user said Input/Select. We'll use just Select for simplicity but you can type in Input as well */}
-            </div>
-          </div>
-        </div>
-        <Button onClick={handleSave} disabled={saving} className="w-full">
-          <Save className="h-4 w-4 mr-2" />
-          {saving ? "Salvando..." : "Salvar Perfil"}
-        </Button>
-      </CardContent>
-    </Card>
+      </div>
+      <Button onClick={handleSave} disabled={saving} className="w-full">
+        {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+        {saving ? "Salvando..." : "Salvar Perfil"}
+      </Button>
+    </div>
   );
 }
 
@@ -310,86 +307,82 @@ function TeamTab() {
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm flex items-center gap-2">
+    <div className="bg-card rounded-xl border border-border/60 overflow-hidden">
+      <div className="px-5 py-3 border-b border-border/40 flex items-center gap-2">
+        <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
           <Users className="h-4 w-4 text-primary" />
-          <span>Gestão de Equipe</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs">Usuário</TableHead>
-                <TableHead className="text-xs">Cargo Descritivo</TableHead>
-                <TableHead className="text-xs">Desde</TableHead>
-                <TableHead className="text-xs w-[160px]">Função na Empresa</TableHead>
-                <TableHead className="text-xs w-[140px]">Nível de Sistema</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {profiles.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell className="text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
-                        <UserCog className="h-3.5 w-3.5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{p.full_name || p.display_name || "—"}</p>
-                        <p className="text-[11px] text-muted-foreground">{p.job_title || "—"}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{p.job_title || "—"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {new Date(p.created_at).toLocaleDateString("pt-BR")}
-                  </TableCell>
-                  <TableCell>
-                    <Select value={p.position || "SDR"} onValueChange={(val) => handleUpdateField(p.user_id, "position", val)}>
-                      <SelectTrigger className="h-8 text-xs w-[150px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="SDR">SDR</SelectItem>
-                        <SelectItem value="Executivo de Negócios">Executivo de Negócios</SelectItem>
-                        <SelectItem value="Diretor">Diretor</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <Select value={p.role || "user"} onValueChange={(val) => handleUpdateField(p.user_id, "role", val)}>
-                      <SelectTrigger className="h-8 text-xs w-[130px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">
-                          <div className="flex items-center gap-1.5"><Shield className="h-3 w-3 text-primary" /> Admin</div>
-                        </SelectItem>
-                        <SelectItem value="gestor">
-                          <div className="flex items-center gap-1.5"><Users className="h-3 w-3 text-muted-foreground" /> Gestor</div>
-                        </SelectItem>
-                        <SelectItem value="user">
-                          <div className="flex items-center gap-1.5"><User className="h-3 w-3 text-muted-foreground" /> User</div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {profiles.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">
-                    Nenhum usuário encontrado.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
         </div>
-      </CardContent>
-    </Card>
+        <span className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">Gestão de Equipe</span>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow className="border-border/30 hover:bg-transparent">
+            <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Usuário</TableHead>
+            <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Cargo Descritivo</TableHead>
+            <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Desde</TableHead>
+            <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase w-[160px]">Função na Empresa</TableHead>
+            <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase w-[140px]">Nível de Sistema</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {profiles.map((p) => (
+            <TableRow key={p.id} className="border-border/25 hover:bg-[#242842]/40">
+              <TableCell className="px-4 py-3 text-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-lg bg-muted/60 border border-border/40 flex items-center justify-center shrink-0">
+                    <UserCog className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">{p.full_name || p.display_name || "—"}</p>
+                    <p className="text-[11px] text-muted-foreground/60">{p.job_title || "—"}</p>
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="px-4 py-3 text-xs text-muted-foreground">{p.job_title || "—"}</TableCell>
+              <TableCell className="px-4 py-3 text-xs text-muted-foreground tabular-nums font-mono">
+                {new Date(p.created_at).toLocaleDateString("pt-BR")}
+              </TableCell>
+              <TableCell className="px-4 py-3">
+                <Select value={p.position || "SDR"} onValueChange={(val) => handleUpdateField(p.user_id, "position", val)}>
+                  <SelectTrigger className="h-8 text-xs w-[150px] bg-muted/30 border-border/40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SDR">SDR</SelectItem>
+                    <SelectItem value="Executivo de Negócios">Executivo de Negócios</SelectItem>
+                    <SelectItem value="Diretor">Diretor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableCell>
+              <TableCell className="px-4 py-3">
+                <Select value={p.role || "user"} onValueChange={(val) => handleUpdateField(p.user_id, "role", val)}>
+                  <SelectTrigger className="h-8 text-xs w-[130px] bg-muted/30 border-border/40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">
+                      <div className="flex items-center gap-1.5"><Shield className="h-3 w-3 text-primary" /> Admin</div>
+                    </SelectItem>
+                    <SelectItem value="gestor">
+                      <div className="flex items-center gap-1.5"><Users className="h-3 w-3 text-muted-foreground" /> Gestor</div>
+                    </SelectItem>
+                    <SelectItem value="user">
+                      <div className="flex items-center gap-1.5"><User className="h-3 w-3 text-muted-foreground" /> User</div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableCell>
+            </TableRow>
+          ))}
+          {profiles.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-10">
+                Nenhum usuário encontrado.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
