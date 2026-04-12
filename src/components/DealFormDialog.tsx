@@ -25,7 +25,7 @@ interface DealFormDialogProps {
 }
 
 function genId() {
-  return Math.random().toString(36).slice(2, 10);
+  return crypto.randomUUID();
 }
 
 export function DealFormDialog({ open, onOpenChange, onSave, editDeal, currentPosition, currentUserId, executivos }: DealFormDialogProps) {

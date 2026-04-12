@@ -110,8 +110,13 @@ export async function fetchDeals(role: UserRole, userId?: string, position?: str
 export async function upsertDeal(deal: Deal): Promise<Deal> {
   const { data: { user } } = await supabase.auth.getUser();
   const isTestEnv = user?.email?.endsWith("@teste.com") || false;
-  
-  const payload = { ...dealToDb(deal), is_test_data: isTestEnv };
+
+  const payload = {
+    ...dealToDb(deal),
+    is_test_data: isTestEnv,
+    // Garante user_id: usa o do deal (Diretor pode atribuir a Executivo) ou o usuário atual
+    user_id: deal.userId || user?.id,
+  };
   const { data, error } = await (supabase as any).from("deals").upsert(payload).select().single();
 
   if (error) {
