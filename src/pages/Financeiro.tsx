@@ -97,7 +97,7 @@ interface SalaryRow {
 }
 
 interface ProfileMap {
-  [userId: string]: { full_name: string; display_name: string; commission_percent: number; fixed_salary: number };
+  [userId: string]: { full_name: string; display_name: string; commission_percent: number; fixed_salary: number; position?: string };
 }
 
 /** Formata datas sem lançar RangeError para datas inválidas. */
@@ -431,7 +431,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
 function FinanceiroContent() {
   const queryClient = useQueryClient();
   const { role, user, position } = useAuth();
-  const { deals = [], settings, presentations, loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal } = useAppData(role, user?.id, position);
+  const { deals = [], settings, presentations, loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal, refreshDeals } = useAppData(role, user?.id, position);
 
   const currentMonthKey = getMonthKey(new Date());
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
@@ -453,11 +453,11 @@ function FinanceiroContent() {
 
       // profiles filtrado por is_test_data para isolamento test/prod
       let profilesRes = await (supabase.from("profiles") as any)
-        .select("user_id, full_name, display_name, commission_percent, fixed_salary")
+        .select("user_id, full_name, display_name, commission_percent, fixed_salary, position")
         .eq("is_test_data", isTestEnv);
       if (profilesRes.error && (profilesRes.error.message?.includes("is_test_data") || profilesRes.error.message?.includes("column"))) {
         profilesRes = await (supabase.from("profiles") as any)
-          .select("user_id, full_name, display_name, commission_percent, fixed_salary");
+          .select("user_id, full_name, display_name, commission_percent, fixed_salary, position");
       }
       const salariesRes = await (supabase.from("salary_payments") as any).select("*");
 
@@ -483,6 +483,9 @@ function FinanceiroContent() {
 
   const querySalaries = data?.salaries || [];
   const profiles = data?.profiles || {};
+
+  // Nome do SDR: primeiro usuário com position "SDR" no ambiente
+  const sdrName = Object.values(profiles).find((p) => p.position === "SDR")?.full_name || "—";
 
   const activeDeals = deals;
   const activeSalaries = querySalaries.length > 0 ? querySalaries : [];
@@ -621,6 +624,7 @@ function FinanceiroContent() {
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }
     toast.success(newStatus ? "Recebimento confirmado!" : "Revertido para Pendente");
+    await refreshDeals();
     queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
@@ -631,13 +635,14 @@ function FinanceiroContent() {
     const newStatus = !currentStatus;
     const { error } = await supabase
       .from("deals")
-      .update({ 
+      .update({
         is_implantacao_paid_by_client: newStatus,
         actual_payment_date: newStatus ? new Date().toISOString() : null
       } as any)
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }
     toast.success(newStatus ? "Recebimento confirmado!" : "Revertido para Pendente");
+    await refreshDeals();
     queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
@@ -654,6 +659,7 @@ function FinanceiroContent() {
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }
     toast.success(checked ? "Parcela confirmada!" : "Parcela desmarcada");
+    await refreshDeals();
     queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
@@ -673,6 +679,7 @@ function FinanceiroContent() {
       .eq("id", dealId);
     if (error) { toast.error("Erro: " + error.message); return; }
     toast.success(newStatus ? "Comissão paga com sucesso!" : "Baixa de comissão desmarcada");
+    await refreshDeals();
     queryClient.invalidateQueries({ queryKey: ["finance-data"] });
   };
 
@@ -831,6 +838,7 @@ function FinanceiroContent() {
             deals={filteredDeals}
             selectedMonth={selectedMonth}
             getUserName={getUserName}
+            sdrName={sdrName}
             onToggleMensalidade={handleToggleMensalidade}
             onToggleImplantacao={handleToggleImplantacao}
             onConfirmInstallment={handleConfirmInstallment}
@@ -945,12 +953,13 @@ interface ReceivablesTabProps {
   deals: Deal[];
   selectedMonth: string;
   getUserName: (id: string) => string;
+  sdrName: string;
   onToggleMensalidade: (id: string, currentStatus: boolean) => void;
   onToggleImplantacao: (id: string, currentStatus: boolean) => void;
   onConfirmInstallment: (id: string, index: number, checked: boolean) => void;
 }
 
-function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: any) {
+function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, sdrName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: any) {
   const [expanded, setExpanded] = useState(false);
   
   const dateForInfo = deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
@@ -981,11 +990,12 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMe
         <TableCell className="w-[30px] px-2 py-3">
           {expanded ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/50" />}
         </TableCell>
-        <TableCell className="px-3 py-3 text-sm font-medium">{getUserName(deal.userId)}</TableCell>
-        <TableCell className="px-3 py-3 text-sm">{deal.clientName}</TableCell>
+        <TableCell className="px-3 py-3 text-sm font-medium">{deal.clientName}</TableCell>
         <TableCell className="px-3 py-3">
           <Badge variant="outline" className="text-[10px] border-border/40">{deal.operation}</Badge>
         </TableCell>
+        <TableCell className="px-3 py-3 text-sm text-muted-foreground">{getUserName(deal.userId)}</TableCell>
+        <TableCell className="px-3 py-3 text-sm text-muted-foreground">{sdrName}</TableCell>
         <TableCell className="px-3 py-3 text-right text-sm font-mono font-semibold text-foreground/90">
           {formatCurrency(totalValue > 0 ? totalValue : (deal.monthlyValue + deal.implantationValue))}
         </TableCell>
@@ -1009,7 +1019,7 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMe
       </TableRow>
       {expanded && (
         <TableRow className="hover:bg-transparent">
-          <TableCell colSpan={8} className="p-0">
+          <TableCell colSpan={9} className="p-0">
             <div className="px-5 py-4 bg-[#242842]/60 border-t border-border/30 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 
               {deal.monthlyValue > 0 && deal.firstPaymentDate && getMonthKey(deal.firstPaymentDate) === selectedMonth && (
@@ -1095,7 +1105,7 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMe
   );
 }
 
-function ReceivablesTab({ deals, selectedMonth, getUserName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: ReceivablesTabProps) {
+function ReceivablesTab({ deals, selectedMonth, getUserName, sdrName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: ReceivablesTabProps) {
   if (deals.length === 0) {
     return (
       <div className="bg-card rounded-xl border border-border/60 py-12 text-center text-muted-foreground text-sm">
@@ -1114,10 +1124,11 @@ function ReceivablesTab({ deals, selectedMonth, getUserName, onToggleMensalidade
           <TableHeader>
             <TableRow className="border-border/30 hover:bg-transparent">
               <TableHead className="w-[30px] px-2"></TableHead>
-              <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">SDR</TableHead>
               <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Cliente</TableHead>
               <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Operação</TableHead>
-              <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Faturamento</TableHead>
+              <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Executivo</TableHead>
+              <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">SDR</TableHead>
+              <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Valor</TableHead>
               <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-center">Data Prevista</TableHead>
               <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-center">Data Realizada</TableHead>
               <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-center w-[120px]">Status</TableHead>
@@ -1130,6 +1141,7 @@ function ReceivablesTab({ deals, selectedMonth, getUserName, onToggleMensalidade
                 deal={deal}
                 selectedMonth={selectedMonth}
                 getUserName={getUserName}
+                sdrName={sdrName}
                 onToggleMensalidade={onToggleMensalidade}
                 onToggleImplantacao={onToggleImplantacao}
                 onConfirmInstallment={onConfirmInstallment}
