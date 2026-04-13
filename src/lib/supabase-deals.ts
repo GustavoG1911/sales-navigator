@@ -143,7 +143,7 @@ export async function upsertDeal(deal: Deal): Promise<Deal> {
 }
 
 export async function deleteDealFromDb(id: string): Promise<void> {
-  const { error } = await supabase.from("deals").delete().eq("id", id);
+  const { error } = await (supabase as any).from("deals").delete().eq("id", id);
   if (error) throw error;
 }
 
