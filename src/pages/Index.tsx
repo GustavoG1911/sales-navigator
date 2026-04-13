@@ -75,24 +75,31 @@ export default function Index() {
 
   useEffect(() => {
     if (!position || position === "SDR") return;
-    (supabase as any).from("profiles").select("user_id, full_name, position").then(({ data }: { data: any[] | null }) => {
-      if (data) {
-        const map: any = {};
-        data.forEach(p => map[p.user_id] = p.full_name);
-        setProfiles(map);
-        setSdrs(
-          data
-            .filter(p => p.position === "SDR")
-            .map(p => ({ id: p.user_id, name: p.full_name }))
-        );
-        if (position === "Diretor") {
-          setExecutivos(
-            data
-              .filter(p => p.position === "Executivo de Negócios")
-              .map(p => ({ id: p.user_id, name: p.full_name }))
-          );
-        }
-      }
+    supabase.auth.getUser().then(({ data: authData }) => {
+      const isTestEnv = authData.user?.email?.endsWith("@teste.com") || false;
+      (supabase as any)
+        .from("profiles")
+        .select("user_id, full_name, display_name, position")
+        .eq("is_test_data", isTestEnv)
+        .then(({ data }: { data: any[] | null }) => {
+          if (data) {
+            const map: any = {};
+            data.forEach(p => map[p.user_id] = p.full_name || p.display_name || "-");
+            setProfiles(map);
+            setSdrs(
+              data
+                .filter(p => p.position === "SDR")
+                .map(p => ({ id: p.user_id, name: p.full_name || p.display_name || "SDR" }))
+            );
+            if (position === "Diretor") {
+              setExecutivos(
+                data
+                  .filter(p => p.position === "Executivo de Negócios")
+                  .map(p => ({ id: p.user_id, name: p.full_name || p.display_name || "Executivo" }))
+              );
+            }
+          }
+        });
     });
   }, [position]);
 
