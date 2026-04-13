@@ -62,16 +62,16 @@ export function calculateCommission(
 }
 
 /**
- * Get the presentations count for a specific deal based on its FINANCIAL month.
- * Uses the same Regra do Dia 07 logic as the KPI filters so that the commission
- * tier always matches the month the deal is counted in, not the closing month.
+ * Get the presentations count for a specific deal based on its CLOSING month.
+ * The commission tier is determined by the month the deal was signed —
+ * the month where the SDR's presentations effort happened.
+ * The Regra do Dia 07 controls when money is received, not which goal tier applies.
  */
 export function getPresentationsForDeal(
   deal: Deal,
   presentations: MonthlyPresentations
 ): number {
-  const baseDate = deal.actualPaymentDate || deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
-  const { monthKey } = getPaymentDateInfo(baseDate);
+  const monthKey = getMonthKey(deal.closingDate);
   const monthData = presentations[monthKey] || { bluepex: 0, opus: 0 };
   return deal.operation === "BluePex" ? monthData.bluepex : monthData.opus;
 }
