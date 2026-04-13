@@ -28,31 +28,37 @@ const dbToDeal = (db: any): Deal => ({
   paymentStatus: db.payment_status || "Pendente",
 });
 
-const dealToDb = (deal: Partial<Deal>) => ({
-  id: deal.id,
-  client_name: deal.clientName,
-  operation: deal.operation,
-  closing_date: deal.closingDate,
-  implantation_value: deal.implantationValue,
-  monthly_value: deal.monthlyValue,
-  is_implantacao_paid: deal.isImplantacaoPaid,
-  is_mensalidade_paid: deal.isMensalidadePaid,
-  is_paid_to_user: deal.isPaidToUser,
-  is_user_confirmed_payment: deal.isUserConfirmedPayment,
-  is_mensalidade_paid_by_client: deal.isMensalidadePaidByClient,
-  is_installment: deal.isInstallment,
-  installment_count: deal.installmentCount,
-  installment_dates: deal.installmentDates,
-  user_id: deal.userId,
-  sdr_user_id: deal.sdrUserId,
-  implantation_payment_date: deal.implantationPaymentDate,
-  first_payment_date: deal.firstPaymentDate,
-  actual_payment_date: deal.actualPaymentDate,
-  commission_amount_snapshot: deal.commissionAmountSnapshot,
-  commission_rate_snapshot: deal.commissionRateSnapshot,
-  payment_status: deal.paymentStatus,
-  is_test_data: deal.isTestData,
-});
+const dealToDb = (deal: Partial<Deal>) => {
+  const base: Record<string, unknown> = {
+    id: deal.id,
+    client_name: deal.clientName,
+    operation: deal.operation,
+    closing_date: deal.closingDate,
+    implantation_value: deal.implantationValue,
+    monthly_value: deal.monthlyValue,
+    is_implantacao_paid: deal.isImplantacaoPaid,
+    is_mensalidade_paid: deal.isMensalidadePaid,
+    is_paid_to_user: deal.isPaidToUser,
+    is_user_confirmed_payment: deal.isUserConfirmedPayment,
+    is_mensalidade_paid_by_client: deal.isMensalidadePaidByClient,
+    is_installment: deal.isInstallment,
+    installment_count: deal.installmentCount,
+    installment_dates: deal.installmentDates,
+    user_id: deal.userId,
+    implantation_payment_date: deal.implantationPaymentDate,
+    first_payment_date: deal.firstPaymentDate,
+    actual_payment_date: deal.actualPaymentDate,
+    commission_amount_snapshot: deal.commissionAmountSnapshot,
+    commission_rate_snapshot: deal.commissionRateSnapshot,
+    payment_status: deal.paymentStatus,
+    is_test_data: deal.isTestData,
+  };
+  // sdr_user_id requer coluna no banco — incluído apenas quando definido
+  if (deal.sdrUserId !== undefined) {
+    base.sdr_user_id = deal.sdrUserId || null;
+  }
+  return base;
+};
 
 export async function fetchDeals(role: UserRole, userId?: string, position?: string): Promise<Deal[]> {
   const { data: { user } } = await supabase.auth.getUser();

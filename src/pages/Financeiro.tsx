@@ -156,7 +156,7 @@ export default function Financeiro() {
 
 function UserFinanceiroContent({ userId }: { userId: string }) {
   const { role, user, position } = useAuth();
-  const { deals = [], settings, presentations, loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal } = useAppData(role, user?.id, position);
+  const { deals = [], settings, presentations, loading: appLoading, updateAdjustment, removeDeal, addOrUpdateDeal, refreshDeals } = useAppData(role, user?.id, position);
   const queryClient = useQueryClient();
   const currentMonthKey = getMonthKey(new Date());
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
@@ -278,7 +278,8 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
       return;
     }
     toast.success("Recebimento confirmado e ciclo encerrado!");
-    queryClient.invalidateQueries({ queryKey: ["finance-data"] });
+    await refreshDeals();
+    queryClient.invalidateQueries({ queryKey: ["user-finance-data", userId] });
   };
 
   const getUserName = (id: string) => profiles[id]?.full_name || "-";
@@ -536,7 +537,19 @@ function FinanceiroContent() {
   }, [activeSalaries, selectedMonth, filterType, selectedYear, filtroFuncionario, filtroStatus]);
 
   const kpis = useMemo(() => {
-    const totalFixo = filteredSalaries.reduce((acc, s) => acc + s.amount, 0);
+    // Soma pagamentos explícitos de salary_payments
+    const usersWithPayments = new Set(filteredSalaries.map((s: any) => s.user_id));
+    const explicitFixo = filteredSalaries.reduce((acc: number, s: any) => acc + (s.amount || 0), 0);
+    // Fallback: para usuários sem registro de pagamento no período, usa fixed_salary do perfil
+    let fallbackFixo = 0;
+    Object.entries(profiles).forEach(([uid, profile]) => {
+      if (usersWithPayments.has(uid)) return;
+      const fixedSal = (profile as any).fixed_salary || 0;
+      if (fixedSal <= 0) return;
+      if (filtroFuncionario !== "Todos" && filtroFuncionario !== uid) return;
+      fallbackFixo += fixedSal;
+    });
+    const totalFixo = explicitFixo + fallbackFixo;
 
     let totalProjetado = 0;
     let totalPago = 0;
