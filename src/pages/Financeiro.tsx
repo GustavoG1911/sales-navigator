@@ -183,7 +183,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
 
   const filteredDeals = useMemo(() => {
     return activeDeals.filter((d) => {
-      const baseDate = d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
+      const baseDate = d.actualPaymentDate || d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
       if (!baseDate) return false;
       const { monthKey } = getPaymentDateInfo(baseDate);
       return monthKey === selectedMonth;
@@ -193,10 +193,6 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
   const filteredSalaries = useMemo(() => {
     return activeSalaries.filter((s) => getMonthKey(s.reference_month) === selectedMonth);
   }, [activeSalaries, selectedMonth]);
-
-  const payableDeals = useMemo(() => {
-    return filteredDeals.filter((d) => d.isMensalidadePaidByClient || d.isImplantacaoPaid);
-  }, [filteredDeals]);
 
   const futureProjections = useMemo(() => {
     const projMap: Record<string, { projectedIn: number }> = {};
@@ -292,7 +288,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
         <div className="bg-card rounded-xl border border-border/60 overflow-hidden">
           <div className="px-5 py-3 border-b border-border/40 flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-primary" />
-            <span className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">Minhas Comissões (Destravadas)</span>
+            <span className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">Comissões do Período</span>
           </div>
           <Table>
             <TableHeader>
@@ -305,14 +301,14 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payableDeals.length === 0 ? (
+              {filteredDeals.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
-                    Nenhuma comissão destravada para este mês.
+                    Nenhuma comissão prevista para este período.
                   </TableCell>
                 </TableRow>
               ) : (
-                payableDeals.map((deal) => {
+                filteredDeals.map((deal) => {
                   const presCount = getPresentationsForDeal(deal, presentations);
                   const comm = calculateCommission(deal, presCount, settings, false);
                   return (
@@ -322,10 +318,10 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                         <Badge variant="outline" className="text-[10px] border-border/40">{deal.operation}</Badge>
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right text-sm font-mono font-semibold text-foreground/90">
-                        {deal.isMensalidadePaidByClient ? formatCurrency(comm.monthlyCommission) : "—"}
+                        {comm.monthlyCommission > 0 ? formatCurrency(comm.monthlyCommission) : "—"}
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right text-sm font-mono font-semibold text-foreground/90">
-                        {deal.isImplantacaoPaid ? formatCurrency(comm.implantationCommission) : "—"}
+                        {comm.implantationCommission > 0 ? formatCurrency(comm.implantationCommission) : "—"}
                       </TableCell>
                       <TableCell className="px-4 py-3 text-center">
                         {deal.isUserConfirmedPayment ? (
@@ -334,6 +330,8 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                           <Button size="sm" onClick={() => handleSDRConfirm(deal.id)} className="h-7 text-[10px] bg-success hover:bg-success/90 text-success-foreground">
                             Confirmar Recebimento
                           </Button>
+                        ) : deal.isMensalidadePaidByClient || deal.isImplantacaoPaid ? (
+                          <span className="pill-blue">Destravado</span>
                         ) : (
                           <span className="pill-yellow">A Receber</span>
                         )}
@@ -560,11 +558,6 @@ function FinanceiroContent() {
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
       .slice(0, 6); // Limita projeção
   }, [activeDeals, selectedMonth, filterType, selectedYear, filtroOperacao, filtroFuncionario, presentations, settings]);
-
-  // Deals with confirmed client payment (ready for payout)
-  const payableDeals = useMemo(() => {
-    return filteredDeals.filter((d) => d.isMensalidadePaidByClient || d.isImplantacaoPaid);
-  }, [filteredDeals]);
 
   const handleToggleMensalidade = async (dealId: string, currentStatus: boolean) => {
     if (currentStatus) {
