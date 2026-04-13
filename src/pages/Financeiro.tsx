@@ -109,6 +109,21 @@ function formatSafeDate(date: any, fmt = "dd/MM/yyyy"): string {
   return format(d, fmt, { locale: ptBR });
 }
 
+/**
+ * Retorna os meses financeiros separados para mensalidade e implantação.
+ * Mensalidade: actualPaymentDate → firstPaymentDate → closingDate
+ * Implantação: implantationPaymentDate → firstPaymentDate → closingDate
+ * A Regra do Dia 07 é aplicada a cada data independentemente.
+ */
+function getDealMonthKeys(deal: Deal): { mensalidadeMonthKey: string | null; implantacaoMonthKey: string | null } {
+  const mensalidadeBase = deal.actualPaymentDate || deal.firstPaymentDate || deal.closingDate;
+  const implantacaoBase = deal.implantationPaymentDate || deal.firstPaymentDate || deal.closingDate;
+  return {
+    mensalidadeMonthKey: mensalidadeBase ? getPaymentDateInfo(mensalidadeBase).monthKey : null,
+    implantacaoMonthKey: implantacaoBase ? getPaymentDateInfo(implantacaoBase).monthKey : null,
+  };
+}
+
 function buildMonthOptions(): { value: string; label: string }[] {
   const options: { value: string; label: string }[] = [];
   const now = new Date();
@@ -181,12 +196,11 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
   const activeDeals = deals; // fetchDeals já filtra por position (SDR vê Executivos, Executivo vê próprios)
   const activeSalaries = querySalaries.length > 0 ? querySalaries : [];
 
+  // Deals onde mensalidade OU implantação têm competência financeira no mês selecionado
   const filteredDeals = useMemo(() => {
     return activeDeals.filter((d) => {
-      const baseDate = d.actualPaymentDate || d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
-      if (!baseDate) return false;
-      const { monthKey } = getPaymentDateInfo(baseDate);
-      return monthKey === selectedMonth;
+      const { mensalidadeMonthKey, implantacaoMonthKey } = getDealMonthKeys(d);
+      return mensalidadeMonthKey === selectedMonth || implantacaoMonthKey === selectedMonth;
     });
   }, [activeDeals, selectedMonth]);
 
@@ -197,17 +211,24 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
   const futureProjections = useMemo(() => {
     const projMap: Record<string, { projectedIn: number }> = {};
     activeDeals.forEach((deal) => {
-      const baseDate = deal.firstPaymentDate || deal.implantationPaymentDate;
-      if (!baseDate) return;
-      
-      const { monthKey } = getPaymentDateInfo(baseDate);
-      if (monthKey > selectedMonth) {
-        if (!projMap[monthKey]) projMap[monthKey] = { projectedIn: 0 };
-        
-        const presCount = getPresentationsForDeal(deal, presentations);
-        const comm = calculateCommission(deal, presCount, settings, false);
-        
-        projMap[monthKey].projectedIn += comm.totalCommission;
+      const { mensalidadeMonthKey, implantacaoMonthKey } = getDealMonthKeys(deal);
+      const presCount = getPresentationsForDeal(deal, presentations);
+      const comm = calculateCommission(deal, presCount, settings, false);
+      const mensalidadeComm = comm.monthlyCommission + comm.superMetaBonus;
+
+      // Mensalidade futura
+      if (mensalidadeMonthKey && mensalidadeMonthKey > selectedMonth) {
+        if (!projMap[mensalidadeMonthKey]) projMap[mensalidadeMonthKey] = { projectedIn: 0 };
+        projMap[mensalidadeMonthKey].projectedIn += mensalidadeComm;
+      }
+      // Implantação futura (apenas se em mês diferente da mensalidade)
+      if (implantacaoMonthKey && implantacaoMonthKey > selectedMonth && implantacaoMonthKey !== mensalidadeMonthKey) {
+        if (!projMap[implantacaoMonthKey]) projMap[implantacaoMonthKey] = { projectedIn: 0 };
+        projMap[implantacaoMonthKey].projectedIn += comm.implantationCommission;
+      }
+      // Se ambas no mesmo mês futuro, a mensalidade já inclui tudo (totalCommission)
+      if (mensalidadeMonthKey && mensalidadeMonthKey > selectedMonth && implantacaoMonthKey === mensalidadeMonthKey) {
+        projMap[mensalidadeMonthKey].projectedIn += comm.implantationCommission;
       }
     });
 
@@ -221,13 +242,20 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
     let paid = 0;
     let volume = 0;
     filteredDeals.forEach((deal) => {
-      volume += (deal.monthlyValue + deal.implantationValue);
-      
+      const { mensalidadeMonthKey, implantacaoMonthKey } = getDealMonthKeys(deal);
+      const mensalidadeInMonth = mensalidadeMonthKey === selectedMonth;
+      const implantacaoInMonth = implantacaoMonthKey === selectedMonth;
+
+      if (mensalidadeInMonth) volume += deal.monthlyValue || 0;
+      if (implantacaoInMonth) volume += deal.implantationValue || 0;
+
       const presCount = getPresentationsForDeal(deal, presentations);
       const comm = calculateCommission(deal, presCount, settings, false);
+      const mensalidadeComm = comm.monthlyCommission + comm.superMetaBonus;
+      const commInMonth = (mensalidadeInMonth ? mensalidadeComm : 0) + (implantacaoInMonth ? comm.implantationCommission : 0);
 
-      if (deal.isPaidToUser) paid += comm.totalCommission;
-      else projected += comm.totalCommission;
+      if (deal.isPaidToUser) paid += commInMonth;
+      else projected += commInMonth;
     });
 
     const totalFixo = filteredSalaries.length > 0 ? filteredSalaries.reduce((acc, s) => acc + s.amount, 0) : (profiles[userId]?.fixed_salary || 0);
@@ -309,8 +337,12 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                 </TableRow>
               ) : (
                 filteredDeals.map((deal) => {
+                  const { mensalidadeMonthKey, implantacaoMonthKey } = getDealMonthKeys(deal);
+                  const mensalidadeInMonth = mensalidadeMonthKey === selectedMonth;
+                  const implantacaoInMonth = implantacaoMonthKey === selectedMonth;
                   const presCount = getPresentationsForDeal(deal, presentations);
                   const comm = calculateCommission(deal, presCount, settings, false);
+                  const mensalidadeComm = comm.monthlyCommission + comm.superMetaBonus;
                   return (
                     <TableRow key={deal.id} className="border-border/25 hover:bg-[#242842]/40">
                       <TableCell className="px-4 py-3 text-sm font-medium">{deal.clientName}</TableCell>
@@ -318,10 +350,10 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                         <Badge variant="outline" className="text-[10px] border-border/40">{deal.operation}</Badge>
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right text-sm font-mono font-semibold text-foreground/90">
-                        {comm.monthlyCommission > 0 ? formatCurrency(comm.monthlyCommission) : "—"}
+                        {mensalidadeInMonth && mensalidadeComm > 0 ? formatCurrency(mensalidadeComm) : "—"}
                       </TableCell>
                       <TableCell className="px-4 py-3 text-right text-sm font-mono font-semibold text-foreground/90">
-                        {comm.implantationCommission > 0 ? formatCurrency(comm.implantationCommission) : "—"}
+                        {implantacaoInMonth && comm.implantationCommission > 0 ? formatCurrency(comm.implantationCommission) : "—"}
                       </TableCell>
                       <TableCell className="px-4 py-3 text-center">
                         {deal.isUserConfirmedPayment ? (
@@ -457,14 +489,13 @@ function FinanceiroContent() {
 
   const filteredDeals = useMemo(() => {
     return activeDeals.filter((d) => {
-      // Time filtering based on filterType
-      const baseDate = d.actualPaymentDate || d.firstPaymentDate || d.implantationPaymentDate || d.closingDate;
-      const { monthKey: dealMonthKey } = getPaymentDateInfo(baseDate);
+      // Time filtering: deal entra no mês se mensalidade OU implantação cai nele
+      const { mensalidadeMonthKey, implantacaoMonthKey } = getDealMonthKeys(d);
       let passTime = false;
       if (filterType === "month") {
-        passTime = dealMonthKey === selectedMonth;
+        passTime = mensalidadeMonthKey === selectedMonth || implantacaoMonthKey === selectedMonth;
       } else {
-        passTime = dealMonthKey.startsWith(selectedYear);
+        passTime = (mensalidadeMonthKey?.startsWith(selectedYear) ?? false) || (implantacaoMonthKey?.startsWith(selectedYear) ?? false);
       }
 
       // Operation
@@ -510,53 +541,70 @@ function FinanceiroContent() {
     let totalPago = 0;
     let volumeTotal = 0;
 
-    // filteredDeals already has time, operation, user, and status filters applied
     filteredDeals.forEach((deal) => {
-      volumeTotal += deal.monthlyValue + deal.implantationValue;
-
+      const { mensalidadeMonthKey, implantacaoMonthKey } = getDealMonthKeys(deal);
       const presCount = getPresentationsForDeal(deal, presentations);
       const comm = calculateCommission(deal, presCount, settings, false);
+      const mensalidadeComm = comm.monthlyCommission + comm.superMetaBonus;
 
-      if (deal.isPaidToUser) {
-        totalPago += comm.totalCommission;
+      // Conta apenas a parte que pertence ao período filtrado
+      let commInPeriod = 0;
+      if (filterType === "month") {
+        const mensalidadeInMonth = mensalidadeMonthKey === selectedMonth;
+        const implantacaoInMonth = implantacaoMonthKey === selectedMonth;
+        if (mensalidadeInMonth) { volumeTotal += deal.monthlyValue || 0; commInPeriod += mensalidadeComm; }
+        if (implantacaoInMonth) { volumeTotal += deal.implantationValue || 0; commInPeriod += comm.implantationCommission; }
       } else {
-        totalProjetado += comm.totalCommission;
+        const mensalidadeInYear = mensalidadeMonthKey?.startsWith(selectedYear) ?? false;
+        const implantacaoInYear = implantacaoMonthKey?.startsWith(selectedYear) ?? false;
+        if (mensalidadeInYear) { volumeTotal += deal.monthlyValue || 0; commInPeriod += mensalidadeComm; }
+        if (implantacaoInYear && implantacaoMonthKey !== mensalidadeMonthKey) { volumeTotal += deal.implantationValue || 0; commInPeriod += comm.implantationCommission; }
+        if (implantacaoInYear && implantacaoMonthKey === mensalidadeMonthKey && !mensalidadeInYear) { volumeTotal += deal.implantationValue || 0; commInPeriod += comm.implantationCommission; }
       }
+
+      if (deal.isPaidToUser) totalPago += commInPeriod;
+      else totalProjetado += commInPeriod;
     });
 
     return { totalFixo, totalProjetado, totalPago, volumeTotal };
-  }, [filteredDeals, filteredSalaries, presentations, settings]);
+  }, [filteredDeals, filteredSalaries, filterType, selectedMonth, selectedYear, presentations, settings]);
 
   const futureProjections = useMemo(() => {
     const projMap: Record<string, { projectedIn: number, projectedOut: number }> = {};
+    const addToMap = (monthKey: string, volume: number, commission: number) => {
+      if (!projMap[monthKey]) projMap[monthKey] = { projectedIn: 0, projectedOut: 0 };
+      projMap[monthKey].projectedIn += volume;
+      projMap[monthKey].projectedOut += commission;
+    };
+
     activeDeals.forEach((deal) => {
-      // Respect operation and user filters
       if (filtroOperacao !== "Todas" && deal.operation !== filtroOperacao) return;
       if (filtroFuncionario !== "Todos" && deal.userId !== filtroFuncionario) return;
 
-      const baseDate = deal.actualPaymentDate || deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
-      if (!baseDate) return;
-      const { monthKey } = getPaymentDateInfo(baseDate);
+      const { mensalidadeMonthKey, implantacaoMonthKey } = getDealMonthKeys(deal);
+      const presCount = getPresentationsForDeal(deal, presentations);
+      const comm = calculateCommission(deal, presCount, settings, false);
+      const mensalidadeComm = comm.monthlyCommission + comm.superMetaBonus;
 
-      const isFuture = filterType === "month" 
-        ? monthKey > selectedMonth 
-        : monthKey.split("-")[0] > selectedYear;
+      const isFutureMes = (mk: string | null) => mk && (filterType === "month" ? mk > selectedMonth : mk.split("-")[0] > selectedYear);
 
-      if (isFuture) {
-        if (!projMap[monthKey]) projMap[monthKey] = { projectedIn: 0, projectedOut: 0 };
-        projMap[monthKey].projectedIn += deal.monthlyValue + deal.implantationValue;
-
-        const presCount = getPresentationsForDeal(deal, presentations);
-        const comm = calculateCommission(deal, presCount, settings, false);
-
-        projMap[monthKey].projectedOut += comm.totalCommission;
+      if (isFutureMes(mensalidadeMonthKey)) {
+        addToMap(mensalidadeMonthKey!, deal.monthlyValue || 0, mensalidadeComm);
+      }
+      if (isFutureMes(implantacaoMonthKey) && implantacaoMonthKey !== mensalidadeMonthKey) {
+        addToMap(implantacaoMonthKey!, deal.implantationValue || 0, comm.implantationCommission);
+      }
+      // Se ambas no mesmo mês futuro, adiciona implantação junto
+      if (isFutureMes(implantacaoMonthKey) && implantacaoMonthKey === mensalidadeMonthKey) {
+        projMap[mensalidadeMonthKey!].projectedIn += deal.implantationValue || 0;
+        projMap[mensalidadeMonthKey!].projectedOut += comm.implantationCommission;
       }
     });
 
     return Object.entries(projMap)
       .map(([key, vals]) => ({ monthKey: key, ...vals }))
       .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
-      .slice(0, 6); // Limita projeção
+      .slice(0, 6);
   }, [activeDeals, selectedMonth, filterType, selectedYear, filtroOperacao, filtroFuncionario, presentations, settings]);
 
   const handleToggleMensalidade = async (dealId: string, currentStatus: boolean) => {
