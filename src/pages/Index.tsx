@@ -23,7 +23,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Plus, DollarSign, TrendingUp, BadgeDollarSign, CalendarDays, FileDown, Printer, BarChart3, HelpCircle } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, LabelList } from "recharts";
 
 export default function Index() {
   const queryClient = useQueryClient();
@@ -133,8 +133,8 @@ export default function Index() {
     [deals, selectedMonthKey, isSingleMonth, dateRange, isDirector, filtroOperacao, filtroFuncionario, user?.id]
   );
 
-  // Table mirrors exactly the same deals that compose the KPIs (payment-date competência / Regra do Dia 07)
-  const filteredDeals = financialDeals;
+  // Tabela mostra fechamentos por data de assinatura (closingDate), igual ao KPI de Fechamentos
+  const filteredDeals = closedDeals;
 
   // Timeline Data for Charts
   const chartTimeline = useMemo(() => {
@@ -201,54 +201,75 @@ export default function Index() {
     }));
   }, [isSingleMonth, chartTimeline]);
 
+  // Comissão gerada pelos contratos assinados no período (usa closedDeals)
+  // Receita esperada NESTE MÊS pela Regra do Dia 07 (usa financialDeals)
   const kpis = useMemo(() => {
-    let totalComissoes = 0;
-    let totalVolumeBruto = 0;
-
-    financialDeals.forEach(deal => {
-      totalVolumeBruto += (deal.monthlyValue || 0) + (deal.implantationValue || 0);
+    let comissaoFechamentos = 0;
+    let volumeFechamentos = 0;
+    closedDeals.forEach(deal => {
+      volumeFechamentos += (deal.monthlyValue || 0) + (deal.implantationValue || 0);
       const presCount = getPresentationsForDeal(deal, optimisticPresentations);
       const comm = calculateCommission(deal, presCount, settings, false);
-      totalComissoes += comm.totalCommission;
+      comissaoFechamentos += comm.totalCommission;
     });
+    const ticketMedio = closedDeals.length > 0 ? volumeFechamentos / closedDeals.length : 0;
 
-    const ticketMedio = financialDeals.length > 0 ? totalVolumeBruto / financialDeals.length : 0;
+    let receitaPrevista = 0;
+    financialDeals.forEach(deal => {
+      const presCount = getPresentationsForDeal(deal, optimisticPresentations);
+      const comm = calculateCommission(deal, presCount, settings, false);
+      receitaPrevista += comm.totalCommission;
+    });
 
     return [
       {
-        title: "Comissões Projetadas",
-        value: totalComissoes,
-        type: "currency" as const,
-        icon: TrendingUp,
-        variant: "primary" as const,
-        modalType: "projected" as "projected" | "paid" | "deals" | null
-      },
-      {
-        title: "Volume Bruto Vendido",
-        value: totalVolumeBruto,
-        type: "currency" as const,
-        icon: DollarSign,
-        variant: "warning" as const,
-        modalType: "deals" as "projected" | "paid" | "deals" | null
-      },
-      {
-        title: "Fechamentos",
-        value: financialDeals.length,
+        title: "Fechamentos do Mês",
+        subtitle: "Contratos assinados no período",
+        value: closedDeals.length,
         type: "number" as const,
         icon: BarChart3,
         variant: "success" as const,
         modalType: "deals" as "projected" | "paid" | "deals" | null
       },
       {
-        title: "Ticket Médio",
-        value: ticketMedio,
+        title: "Comissão dos Fechamentos",
+        subtitle: "Resultado dos contratos assinados",
+        value: comissaoFechamentos,
+        type: "currency" as const,
+        icon: TrendingUp,
+        variant: "primary" as const,
+        modalType: "projected" as "projected" | "paid" | "deals" | null
+      },
+      {
+        title: "Receita Prevista neste Mês",
+        subtitle: "Comissões pela Regra do Dia 07",
+        value: receitaPrevista,
         type: "currency" as const,
         icon: BadgeDollarSign,
-        variant: "primary" as const,
+        variant: "warning" as const,
+        modalType: null
+      },
+      {
+        title: "Ticket Médio",
+        subtitle: "Volume médio por fechamento",
+        value: ticketMedio,
+        type: "currency" as const,
+        icon: DollarSign,
+        variant: "default" as const,
         modalType: null
       }
     ];
-  }, [financialDeals, optimisticPresentations, settings]);
+  }, [closedDeals, financialDeals, optimisticPresentations, settings]);
+
+  // Aviso: contratos assinados neste mês têm competência financeira em outro mês
+  const closedDealsFinancialMonth = useMemo(() => {
+    if (!isSingleMonth || closedDeals.length === 0 || financialDeals.length > 0) return null;
+    const firstDeal = closedDeals[0];
+    const baseDate = firstDeal.firstPaymentDate || firstDeal.implantationPaymentDate || firstDeal.closingDate;
+    if (!baseDate) return null;
+    const { monthKey } = getPaymentDateInfo(baseDate);
+    return monthKey !== selectedMonthKey ? monthKey : null;
+  }, [isSingleMonth, closedDeals, financialDeals, selectedMonthKey]);
 
   const handleStatusChange = async (deal: Deal, status: PaymentStatus) => {
     await addOrUpdateDeal({ ...deal, paymentStatus: status });
@@ -309,7 +330,7 @@ export default function Index() {
       <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold text-foreground tracking-tight">Dashboard de Vendas</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{periodLabel} · {filteredDeals.length} fechamento(s)</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{periodLabel} · {closedDeals.length} fechamento(s)</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -362,11 +383,12 @@ export default function Index() {
       </div>
 
       {/* ── LINHA 1: KPI cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {kpis.map((kpi, idx) => (
           <KpiCard
             key={idx}
             title={kpi.title}
+            subtitle={kpi.subtitle}
             value={kpi.type === "currency" ? formatCurrency(kpi.value) : kpi.value.toString()}
             icon={kpi.icon}
             variant={kpi.variant}
@@ -374,6 +396,18 @@ export default function Index() {
           />
         ))}
       </div>
+
+      {/* ── Aviso de competência financeira em outro mês ── */}
+      {closedDealsFinancialMonth && (
+        <div className="mb-6 px-4 py-3 rounded-xl border border-warning/30 bg-warning/8 text-xs text-warning flex items-center gap-2">
+          <span className="shrink-0">⚠</span>
+          <span>
+            Os fechamentos deste mês têm competência financeira em{" "}
+            <strong>{formatMonthLabel(closedDealsFinancialMonth)}</strong> pela Regra do Dia 07.
+            Navegue até este mês no seletor de período para ver os KPIs financeiros correspondentes.
+          </span>
+        </div>
+      )}
 
       {/* KPI detail modal */}
       <Dialog open={!!kpiModalType} onOpenChange={(open) => !open && setKpiModalType(null)}>
@@ -448,11 +482,14 @@ export default function Index() {
                 <YAxis tickFormatter={(val) => `${(val/1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#8B92A9' }} />
                 <RechartsTooltip
                   formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{ backgroundColor: '#1A1D2E', border: '1px solid #2D3154', borderRadius: '10px', color: '#F0F2F8', fontSize: '11px' }}
+                  contentStyle={{ backgroundColor: '#1A1D2E', border: '1px solid #2D3154', borderRadius: '8px', color: '#F0F2F8', fontSize: '11px' }}
+                  labelStyle={{ color: '#F0F2F8' }}
+                  itemStyle={{ color: '#4F8EF7' }}
                   cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                 />
                 {isSingleMonth ? (
                   <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    <LabelList dataKey="value" position="top" formatter={(v: number) => v > 0 ? formatCurrency(v) : ""} style={{ fill: '#8B92A9', fontSize: 10 }} />
                     {volumeChartData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
@@ -481,11 +518,14 @@ export default function Index() {
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#8B92A9' }} />
                 <RechartsTooltip
                   formatter={(value: number) => [`${value} APs`, "Apresentações"]}
-                  contentStyle={{ backgroundColor: '#1A1D2E', border: '1px solid #2D3154', borderRadius: '10px', color: '#F0F2F8', fontSize: '11px' }}
+                  contentStyle={{ backgroundColor: '#1A1D2E', border: '1px solid #2D3154', borderRadius: '8px', color: '#F0F2F8', fontSize: '11px' }}
+                  labelStyle={{ color: '#F0F2F8' }}
+                  itemStyle={{ color: '#00D084' }}
                   cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                 />
                 {isSingleMonth ? (
                   <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    <LabelList dataKey="value" position="top" formatter={(v: number) => v > 0 ? `${v} APs` : ""} style={{ fill: '#8B92A9', fontSize: 10 }} />
                     {presChartData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}

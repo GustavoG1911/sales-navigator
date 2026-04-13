@@ -48,7 +48,8 @@ const currentMonth = currentDate.getMonth();
 
 const monthOptions = (() => {
   const opts: { value: string; label: string; range: DateRange }[] = [];
-  for (let i = 5; i >= -1; i--) {
+  // 24 meses atrás até 12 meses à frente (dinâmico, nunca hardcoded)
+  for (let i = 24; i >= -12; i--) {
     const d = new Date(currentYear, currentMonth - i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     opts.push({

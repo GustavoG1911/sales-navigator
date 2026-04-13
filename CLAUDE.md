@@ -123,6 +123,26 @@ Usuários com email `@teste.com` operam em banco isolado (`is_test_data: true`).
 **Arquivo:** `src/pages/Financeiro.tsx`
 **Fix:** `kpis` itera `filteredDeals` (que já tem todos os filtros aplicados) em vez de `activeDeals`. `futureProjections` aplica `filtroOperacao` além de `filtroFuncionario`.
 
+### ✅ RESOLVIDO — Dashboard misturava closedDeals com financialDeals nos KPIs
+**Arquivo:** `src/pages/Index.tsx`
+**Fix:** KPIs separados em dois grupos: "Fechamentos do Mês" e "Comissão dos Fechamentos" usam `closedDeals` (filtro por `closingDate`); "Receita Prevista neste Mês" usa `financialDeals` (filtro por Regra do Dia 07). Banner de aviso aparece quando há fechamentos no mês sem receita prevista (transbordo para mês seguinte).
+
+### ✅ RESOLVIDO — Financeiro "Baixa Concluída" marcava automaticamente (isPaid bug)
+**Arquivo:** `src/pages/Financeiro.tsx` — componente `ExpandableReceivablesRow`
+**Fix:** `isPaid` agora defaulta `false`; só vai a `true` quando o usuário explicitamente confirma o pagamento (mensalidade paga, implantação paga, ou parcela paga no mês).
+
+### ✅ RESOLVIDO — RangeError "Invalid time value" no Financeiro
+**Arquivo:** `src/pages/Financeiro.tsx`
+**Fix:** Adicionado helper `formatSafeDate(date, fmt)` que verifica `isNaN(d.getTime())` antes de formatar. Todos os `format(new Date(...))` substituídos por `formatSafeDate(...)`.
+
+### ✅ RESOLVIDO — fixedSalary perdido ao trocar de usuário
+**Arquivos:** `src/lib/supabase-deals.ts`, `src/hooks/useAppData.ts`
+**Fix:** `fetchUserFixedSalary` e `saveUserFixedSalary` leem/gravam `profiles.fixed_salary` no DB. `useAppData.loadData` busca em paralelo com `commissionRate` e injeta em `settings.fixedSalary`. DB sempre vence o localStorage.
+
+### ✅ RESOLVIDO — Filtros de período limitados (-5/+1 meses)
+**Arquivos:** `src/components/PeriodFilter.tsx`, `src/pages/Financeiro.tsx`
+**Fix:** `PeriodFilter` expandido para -24/+12 meses. `buildMonthOptions` no Financeiro também expandido para -24/+12.
+
 ---
 
 ## IDs dos Usuários de Teste

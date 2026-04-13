@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Deal, MonthlyPresentations, MonthlySuperMeta, AppSettings, ReceivableAdjustments, ReceivableAdjustment } from "@/lib/types";
 import { getSettings, saveSettings, getSuperMeta, saveSuperMeta, getAdjustments, saveAdjustments } from "@/lib/store";
-import { fetchDeals, upsertDeal, deleteDealFromDb, fetchPresentations, savePresentationToDb, fetchUserCommissionRate, saveUserCommissionRate } from "@/lib/supabase-deals";
+import { fetchDeals, upsertDeal, deleteDealFromDb, fetchPresentations, savePresentationToDb, fetchUserCommissionRate, saveUserCommissionRate, fetchUserFixedSalary, saveUserFixedSalary } from "@/lib/supabase-deals";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { UserRole } from "./useAuth";
@@ -18,16 +18,21 @@ export function useAppData(role: UserRole = "user", userId?: string, position?: 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [dealsData, presData, commRate] = await Promise.all([
+      const [dealsData, presData, commRate, fixedSalary] = await Promise.all([
         fetchDeals(role, userId, position),
         fetchPresentations(role, userId, position),
         userId ? fetchUserCommissionRate(userId) : Promise.resolve(null),
+        userId ? fetchUserFixedSalary(userId) : Promise.resolve(null),
       ]);
       setDeals(dealsData);
       setPresentations(presData);
-      if (commRate !== null) {
-        setSettings((prev) => ({ ...prev, commissionRate: commRate }));
-      }
+      // DB always wins over localStorage for both commissionRate and fixedSalary
+      setSettings((prev) => {
+        const next = { ...prev };
+        if (commRate !== null) next.commissionRate = commRate;
+        if (fixedSalary !== null) next.fixedSalary = fixedSalary;
+        return next;
+      });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Erro desconhecido";
       console.error("Error fetching data:", message);
@@ -156,9 +161,12 @@ export function useAppData(role: UserRole = "user", userId?: string, position?: 
     setSettings(newSettings);
     if (userId) {
       try {
-        await saveUserCommissionRate(userId, newSettings.commissionRate);
+        await Promise.all([
+          saveUserCommissionRate(userId, newSettings.commissionRate),
+          saveUserFixedSalary(userId, newSettings.fixedSalary),
+        ]);
       } catch (err: unknown) {
-        console.error("Error saving commission rate to DB:", err instanceof Error ? err.message : err);
+        console.error("Error saving settings to DB:", err instanceof Error ? err.message : err);
       }
     }
   }, [userId]);

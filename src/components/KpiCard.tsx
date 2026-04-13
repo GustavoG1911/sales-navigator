@@ -6,6 +6,7 @@ interface KpiCardProps {
   value: string;
   icon: LucideIcon;
   trend?: string;
+  subtitle?: string;
   variant?: "default" | "primary" | "success" | "warning";
   tooltip?: string;
   onClick?: () => void;
@@ -46,7 +47,7 @@ const variantConfig = {
   },
 } as const;
 
-export function KpiCard({ title, value, icon: Icon, trend, variant = "default", tooltip, onClick }: KpiCardProps) {
+export function KpiCard({ title, value, icon: Icon, trend, subtitle, variant = "default", tooltip, onClick }: KpiCardProps) {
   const cfg = variantConfig[variant];
 
   return (
@@ -82,6 +83,7 @@ export function KpiCard({ title, value, icon: Icon, trend, variant = "default", 
       <div>
         <p className={`text-2xl font-bold tracking-tight ${cfg.valueColor}`}>{value}</p>
         {trend && <p className="text-xs text-muted-foreground mt-1 leading-snug">{trend}</p>}
+        {subtitle && <p className="text-[10px] text-muted-foreground/55 mt-0.5 leading-snug">{subtitle}</p>}
       </div>
 
       {/* Bottom accent bar */}

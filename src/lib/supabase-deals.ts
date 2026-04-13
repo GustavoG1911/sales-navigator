@@ -258,3 +258,27 @@ export async function saveUserCommissionRate(userId: string, rate: number): Prom
     .eq("user_id", userId);
   if (error) throw error;
 }
+
+export async function fetchUserFixedSalary(userId: string): Promise<number | null> {
+  const { data, error } = await (supabase as any)
+    .from("profiles")
+    .select("fixed_salary")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    console.error("[fetchUserFixedSalary] Erro:", error.message);
+    return null;
+  }
+  return data?.fixed_salary ?? null;
+}
+
+export async function saveUserFixedSalary(userId: string, amount: number): Promise<void> {
+  const { error } = await (supabase as any)
+    .from("profiles")
+    .update({ fixed_salary: amount })
+    .eq("user_id", userId);
+  if (error) {
+    console.error("[saveUserFixedSalary] Erro:", error.message);
+    throw error;
+  }
+}

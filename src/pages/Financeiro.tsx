@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Deal } from "@/lib/types";
 
 function FutureProjectionsAccumulatedCard({ projections, position, onSelectMonth }: { projections: any[], position: string, onSelectMonth: (m: string) => void }) {
@@ -99,10 +100,20 @@ interface ProfileMap {
   [userId: string]: { full_name: string; display_name: string; commission_percent: number; fixed_salary: number };
 }
 
+/** Formata datas sem lançar RangeError para datas inválidas. */
+function formatSafeDate(date: any, fmt = "dd/MM/yyyy"): string {
+  if (!date) return "—";
+  const str = typeof date === "string" && !date.includes("T") ? date + "T12:00:00" : date;
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return "—";
+  return format(d, fmt, { locale: ptBR });
+}
+
 function buildMonthOptions(): { value: string; label: string }[] {
   const options: { value: string; label: string }[] = [];
   const now = new Date();
-  for (let i = -6; i <= 3; i++) {
+  // 24 meses atrás até 12 meses à frente
+  for (let i = -24; i <= 12; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
     const key = getMonthKey(d);
     options.push({ value: key, label: formatMonthLabel(key) });
@@ -269,10 +280,10 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
         </Select>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard title="Comissão Paga" value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" />
-        <KpiCard title="Comissão Projetada" value={formatCurrency(kpis.projected)} icon={TrendingUp} variant="primary" />
-        <KpiCard title="Volume de Vendas" value={formatCurrency(kpis.volume)} icon={BarChart3} variant="warning" />
-        <KpiCard title="Salário Fixo" value={formatCurrency(kpis.fixed)} icon={DollarSign} variant="default" />
+        <KpiCard title="Comissão Paga" value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" subtitle="Já confirmada e recebida" />
+        <KpiCard title="Comissão Prevista" value={formatCurrency(kpis.projected)} icon={TrendingUp} variant="primary" subtitle="Esperado receber neste mês pela Regra do Dia 07" />
+        <KpiCard title="Volume de Vendas" value={formatCurrency(kpis.volume)} icon={BarChart3} variant="warning" subtitle="Valor bruto dos contratos do período" />
+        <KpiCard title="Salário Fixo" value={formatCurrency(kpis.fixed)} icon={DollarSign} variant="default" subtitle="Remuneração fixa mensal" />
       </div>
 
       <FutureProjectionsAccumulatedCard projections={futureProjections} position={position} onSelectMonth={setSelectedMonth} />
@@ -368,7 +379,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                       <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40 uppercase tracking-wide">BDtech</span>
                     </TableCell>
                     <TableCell className="px-4 py-3 text-right text-sm font-mono font-semibold">{formatCurrency(s.amount)}</TableCell>
-                    <TableCell className="px-4 py-3 text-sm text-muted-foreground">{format(new Date(s.expected_payment_date + "T12:00:00"), "dd/MM/yyyy")}</TableCell>
+                    <TableCell className="px-4 py-3 text-sm text-muted-foreground">{formatSafeDate(s.expected_payment_date)}</TableCell>
                     <TableCell className="px-4 py-3 text-center">
                       {s.is_paid_by_gestor ? (
                         <span className="pill-green">Recebido</span>
@@ -731,6 +742,7 @@ function FinanceiroContent() {
           value={formatCurrency(kpis.volumeTotal)}
           icon={BarChart3}
           variant="default"
+          subtitle="Valor bruto total dos contratos"
           onClick={() => setKpiModalType("volume")}
         />
         <KpiCard
@@ -738,13 +750,15 @@ function FinanceiroContent() {
           value={formatCurrency(kpis.totalPago)}
           icon={CheckCircle2}
           variant="success"
+          subtitle="Já confirmada e recebida"
           onClick={() => setKpiModalType("pago")}
         />
         <KpiCard
-          title="Comissão Projetada"
+          title="Comissão Prevista"
           value={formatCurrency(kpis.totalProjetado)}
           icon={ArrowDownToLine}
           variant="warning"
+          subtitle="Esperado receber neste mês pela Regra do Dia 07"
           onClick={() => setKpiModalType("projetado")}
         />
         <KpiCard
@@ -752,6 +766,7 @@ function FinanceiroContent() {
           value={formatCurrency(kpis.totalFixo)}
           icon={Wallet}
           variant="default"
+          subtitle="Remuneração fixa consolidada do período"
           onClick={() => setKpiModalType("fixo")}
         />
       </div>
@@ -900,15 +915,22 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMe
   const dateForInfo = deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
   if (!dateForInfo) return null;
   const info = getPaymentDateInfo(dateForInfo);
-  const expectedPaymentDateStr = format(new Date(info.expectedPaymentDate + "T12:00:00"), "dd/MM/yyyy");
+  const expectedPaymentDateStr = formatSafeDate(info.expectedPaymentDate);
   
   const expectMensalidade = deal.monthlyValue > 0 && deal.firstPaymentDate && getMonthKey(deal.firstPaymentDate) === selectedMonth;
   const expectImplantacao = deal.implantationValue > 0 && !deal.isInstallment && deal.implantationPaymentDate && getMonthKey(deal.implantationPaymentDate) === selectedMonth;
-  
-  let isPaid = true;
-  if (expectMensalidade && !deal.isMensalidadePaidByClient) isPaid = false;
-  if (expectImplantacao && !deal.isImplantacaoPaid) isPaid = false;
-  if (!expectMensalidade && !expectImplantacao && (!deal.isInstallment || deal.installmentCount === 0)) isPaid = false;
+
+  // isPaid só é true quando o usuário clicou explicitamente no botão de confirmação
+  let isPaid = false;
+  if (expectMensalidade && deal.isMensalidadePaidByClient) isPaid = true;
+  if (expectImplantacao && deal.isImplantacaoPaid) isPaid = true;
+  if (deal.isInstallment && Array.isArray(deal.installmentDates)) {
+    const hasAnyPaidThisMonth = deal.installmentDates.some((inst: any) => {
+      const dateStr = inst?.date || inst;
+      return dateStr && getMonthKey(dateStr) === selectedMonth && inst?.paid === true;
+    });
+    if (hasAnyPaidThisMonth) isPaid = true;
+  }
 
   const totalValue = (expectMensalidade ? deal.monthlyValue : 0) + (expectImplantacao ? deal.implantationValue : 0);
 
@@ -963,7 +985,7 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMe
                     )}
                   </div>
                   <div className="pt-2 border-t border-border/30 flex justify-between items-center">
-                    <p className="text-[10px] text-muted-foreground/60">Venc: {format(new Date(deal.firstPaymentDate + "T12:00:00"), "dd/MM/yyyy")}</p>
+                    <p className="text-[10px] text-muted-foreground/60">Venc: {formatSafeDate(deal.firstPaymentDate)}</p>
                     <Button size="sm" variant={deal.isMensalidadePaidByClient ? "destructive" : "outline"} className="h-6 text-[10px]" onClick={() => onToggleMensalidade(deal.id, deal.isMensalidadePaidByClient || false)}>
                       {deal.isMensalidadePaidByClient ? "Reverter Baixa" : "Confirmar Recebimento"}
                     </Button>
@@ -985,7 +1007,7 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMe
                     )}
                   </div>
                   <div className="pt-2 border-t border-border/30 flex justify-between items-center">
-                    <p className="text-[10px] text-muted-foreground/60">Venc: {format(new Date(deal.implantationPaymentDate + "T12:00:00"), "dd/MM/yyyy")}</p>
+                    <p className="text-[10px] text-muted-foreground/60">Venc: {formatSafeDate(deal.implantationPaymentDate)}</p>
                     <Button size="sm" variant={deal.isImplantacaoPaid ? "destructive" : "outline"} className="h-6 text-[10px]" onClick={() => onToggleImplantacao(deal.id, deal.isImplantacaoPaid || false)}>
                       {deal.isImplantacaoPaid ? "Reverter Baixa" : "Confirmar Recebimento"}
                     </Button>
@@ -1007,7 +1029,7 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMe
                           <div>
                             <p className="text-xs font-medium">Parcela {idx+1}/{deal.installmentCount}</p>
                             <p className="text-sm font-bold">{formatCurrency(parcelValue)}</p>
-                            <p className="text-[10px] text-muted-foreground">Venc: {format(new Date(dateStr + "T12:00:00"), "dd/MM/yyyy")}</p>
+                            <p className="text-[10px] text-muted-foreground">Venc: {formatSafeDate(dateStr)}</p>
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             {isPaidInst ? (
@@ -1101,7 +1123,7 @@ function ExpandableCommissionRow({ deal, settings, getUserName, presentations, o
 
   if (baseDate) {
     const info = getPaymentDateInfo(baseDate);
-    expectedPaymentDateStr = format(new Date(info.expectedPaymentDate + "T12:00:00"), "dd/MM/yyyy");
+    expectedPaymentDateStr = formatSafeDate(info.expectedPaymentDate);
   }
 
   const presCount = getPresentationsForDeal(deal, presentations);
@@ -1127,7 +1149,7 @@ function ExpandableCommissionRow({ deal, settings, getUserName, presentations, o
         </TableCell>
         <TableCell className="px-3 py-3 text-sm text-center">
           {deal.userPaymentDate ? (
-            <span className="text-success text-xs font-semibold tabular-nums font-mono">{format(new Date(deal.userPaymentDate + "T12:00:00"), "dd/MM/yyyy")}</span>
+            <span className="text-success text-xs font-semibold tabular-nums font-mono">{formatSafeDate(deal.userPaymentDate)}</span>
           ) : (
             <span className="text-[11px] text-muted-foreground/50 italic">A aguardar</span>
           )}
