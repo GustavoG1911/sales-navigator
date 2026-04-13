@@ -484,8 +484,6 @@ function FinanceiroContent() {
   const querySalaries = data?.salaries || [];
   const profiles = data?.profiles || {};
 
-  // Nome do SDR: primeiro usuário com position "SDR" no ambiente
-  const sdrName = Object.values(profiles).find((p) => p.position === "SDR")?.full_name || "—";
 
   const activeDeals = deals;
   const activeSalaries = querySalaries.length > 0 ? querySalaries : [];
@@ -838,7 +836,6 @@ function FinanceiroContent() {
             deals={filteredDeals}
             selectedMonth={selectedMonth}
             getUserName={getUserName}
-            sdrName={sdrName}
             onToggleMensalidade={handleToggleMensalidade}
             onToggleImplantacao={handleToggleImplantacao}
             onConfirmInstallment={handleConfirmInstallment}
@@ -953,13 +950,12 @@ interface ReceivablesTabProps {
   deals: Deal[];
   selectedMonth: string;
   getUserName: (id: string) => string;
-  sdrName: string;
   onToggleMensalidade: (id: string, currentStatus: boolean) => void;
   onToggleImplantacao: (id: string, currentStatus: boolean) => void;
   onConfirmInstallment: (id: string, index: number, checked: boolean) => void;
 }
 
-function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, sdrName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: any) {
+function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: any) {
   const [expanded, setExpanded] = useState(false);
   
   const dateForInfo = deal.firstPaymentDate || deal.implantationPaymentDate || deal.closingDate;
@@ -995,7 +991,7 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, sdrName, o
           <Badge variant="outline" className="text-[10px] border-border/40">{deal.operation}</Badge>
         </TableCell>
         <TableCell className="px-3 py-3 text-sm text-muted-foreground">{getUserName(deal.userId)}</TableCell>
-        <TableCell className="px-3 py-3 text-sm text-muted-foreground">{sdrName}</TableCell>
+        <TableCell className="px-3 py-3 text-sm text-muted-foreground">{deal.sdrUserId ? getUserName(deal.sdrUserId) : "—"}</TableCell>
         <TableCell className="px-3 py-3 text-right text-sm font-mono font-semibold text-foreground/90">
           {formatCurrency(totalValue > 0 ? totalValue : (deal.monthlyValue + deal.implantationValue))}
         </TableCell>
@@ -1105,7 +1101,7 @@ function ExpandableReceivablesRow({ deal, selectedMonth, getUserName, sdrName, o
   );
 }
 
-function ReceivablesTab({ deals, selectedMonth, getUserName, sdrName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: ReceivablesTabProps) {
+function ReceivablesTab({ deals, selectedMonth, getUserName, onToggleMensalidade, onToggleImplantacao, onConfirmInstallment }: ReceivablesTabProps) {
   if (deals.length === 0) {
     return (
       <div className="bg-card rounded-xl border border-border/60 py-12 text-center text-muted-foreground text-sm">
@@ -1141,7 +1137,6 @@ function ReceivablesTab({ deals, selectedMonth, getUserName, sdrName, onToggleMe
                 deal={deal}
                 selectedMonth={selectedMonth}
                 getUserName={getUserName}
-                sdrName={sdrName}
                 onToggleMensalidade={onToggleMensalidade}
                 onToggleImplantacao={onToggleImplantacao}
                 onConfirmInstallment={onConfirmInstallment}

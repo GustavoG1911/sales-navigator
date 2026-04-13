@@ -22,15 +22,17 @@ interface DealFormDialogProps {
   currentPosition?: string;
   currentUserId?: string;
   executivos?: { id: string; name: string }[];
+  sdrs?: { id: string; name: string }[];
 }
 
 function genId() {
   return crypto.randomUUID();
 }
 
-export function DealFormDialog({ open, onOpenChange, onSave, editDeal, currentPosition, currentUserId, executivos }: DealFormDialogProps) {
+export function DealFormDialog({ open, onOpenChange, onSave, editDeal, currentPosition, currentUserId, executivos, sdrs }: DealFormDialogProps) {
   const [closingDate, setClosingDate] = useState<Date | undefined>();
   const [selectedExecutivoId, setSelectedExecutivoId] = useState("");
+  const [selectedSdrId, setSelectedSdrId] = useState("");
   const [operation, setOperation] = useState<Operation>("BluePex");
   const [clientName, setClientName] = useState("");
   const [monthlyValue, setMonthlyValue] = useState("");
@@ -55,6 +57,8 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal, currentPo
       setInstallmentCount(editDeal.installmentCount.toString());
       setInstallmentDates(editDeal.installmentDates.map((d) => new Date(d.date)));
       setPaymentStatus(editDeal.paymentStatus);
+      setSelectedSdrId(editDeal.sdrUserId || "");
+      if (currentPosition === "Diretor" && editDeal.userId) setSelectedExecutivoId(editDeal.userId);
     } else {
       setClosingDate(new Date());
       setOperation("BluePex");
@@ -137,6 +141,7 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal, currentPo
         : [],
       paymentStatus,
       userId: dealUserId,
+      sdrUserId: selectedSdrId || undefined,
     };
     onSave(deal);
     onOpenChange(false);
@@ -177,6 +182,21 @@ export function DealFormDialog({ open, onOpenChange, onSave, editDeal, currentPo
                 <SelectContent>
                   {executivos.map(e => (
                     <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* SDR picker — para Executivo e Diretor */}
+          {currentPosition !== "SDR" && sdrs && sdrs.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>SDR Responsável</Label>
+              <Select value={selectedSdrId} onValueChange={setSelectedSdrId}>
+                <SelectTrigger><SelectValue placeholder="Selecione o SDR" /></SelectTrigger>
+                <SelectContent>
+                  {sdrs.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

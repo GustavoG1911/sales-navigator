@@ -52,6 +52,7 @@ export default function Index() {
   const [filtroOperacao, setFiltroOperacao] = useState("Todas");
   const [profiles, setProfiles] = useState<any>({});
   const [executivos, setExecutivos] = useState<{id: string, name: string}[]>([]);
+  const [sdrs, setSdrs] = useState<{id: string, name: string}[]>([]);
 
   const periodSuffix = periodType === "month" ? "do Mês" : periodType === "quarter" ? "do Trimestre" : periodType === "year" ? "do Ano" : "do Período";
 
@@ -73,20 +74,26 @@ export default function Index() {
   };
 
   useEffect(() => {
-    if (position === "Diretor") {
-      (supabase as any).from("profiles").select("user_id, full_name, position").then(({ data }: { data: any[] | null }) => {
-        if (data) {
-          const map: any = {};
-          data.forEach(p => map[p.user_id] = p.full_name);
-          setProfiles(map);
+    if (!position || position === "SDR") return;
+    (supabase as any).from("profiles").select("user_id, full_name, position").then(({ data }: { data: any[] | null }) => {
+      if (data) {
+        const map: any = {};
+        data.forEach(p => map[p.user_id] = p.full_name);
+        setProfiles(map);
+        setSdrs(
+          data
+            .filter(p => p.position === "SDR")
+            .map(p => ({ id: p.user_id, name: p.full_name }))
+        );
+        if (position === "Diretor") {
           setExecutivos(
             data
               .filter(p => p.position === "Executivo de Negócios")
               .map(p => ({ id: p.user_id, name: p.full_name }))
           );
         }
-      });
-    }
+      }
+    });
   }, [position]);
 
   useEffect(() => {
@@ -561,6 +568,7 @@ export default function Index() {
         currentPosition={position}
         currentUserId={user?.id}
         executivos={executivos}
+        sdrs={sdrs}
       />
     </div>
   );

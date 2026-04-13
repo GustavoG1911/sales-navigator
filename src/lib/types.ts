@@ -21,6 +21,7 @@ export interface Deal {
   installmentDates: InstallmentDate[];
   paymentStatus: PaymentStatus;
   userId?: string;
+  sdrUserId?: string;
   commissionAmountSnapshot?: number;
   commissionRateSnapshot?: number;
   isUserConfirmedPayment?: boolean;
