@@ -41,6 +41,8 @@ function addMonths(date: Date, months: number) {
   return next;
 }
 
+const NO_SDR_VALUE = "__no_sdr__";
+
 function SectionLabel({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 pt-1 pb-0.5">
@@ -97,7 +99,7 @@ export function DealFormDialog({
       setInstallmentCount(editDeal.installmentCount.toString());
       setInstallmentDates(editDeal.installmentDates.map((d) => new Date(d.date)));
       setPaymentStatus(editDeal.paymentStatus);
-      setSelectedSdrId(editDeal.sdrUserId || "");
+      setSelectedSdrId(editDeal.sdrUserId || NO_SDR_VALUE);
       if (currentPosition === "Diretor" && editDeal.userId) setSelectedExecutivoId(editDeal.userId);
     } else {
       const today = new Date();
@@ -112,7 +114,7 @@ export function DealFormDialog({
       setInstallmentCount("2");
       setInstallmentDates([]);
       setPaymentStatus("Pendente");
-      setSelectedSdrId(sdrs?.[0]?.id || "");
+      setSelectedSdrId(NO_SDR_VALUE);
       if (currentPosition === "Diretor" && executivos?.length) setSelectedExecutivoId(executivos[0].id);
     }
   }, [editDeal, open, currentPosition, executivos, sdrs]);
@@ -170,6 +172,10 @@ export function DealFormDialog({
       ? selectedExecutivoId || undefined
       : editDeal?.userId || currentUserId;
 
+    const sdrUserId = selectedSdrId === NO_SDR_VALUE
+      ? editDeal ? null : undefined
+      : selectedSdrId || undefined;
+
     const deal: Deal = {
       id: editDeal?.id || genId(),
       closingDate: closingDate.toISOString(),
@@ -184,7 +190,7 @@ export function DealFormDialog({
       installmentDates: isInstallment ? installmentDates.map((d) => ({ date: d!.toISOString() })) : [],
       paymentStatus,
       userId: dealUserId,
-      sdrUserId: selectedSdrId || undefined,
+      sdrUserId,
     };
 
     onSave(deal);
@@ -277,6 +283,7 @@ export function DealFormDialog({
                       <SelectValue placeholder="Selecione o SDR" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={NO_SDR_VALUE}>Sem SDR</SelectItem>
                       {sdrs.map((sdr) => (
                         <SelectItem key={sdr.id} value={sdr.id}>{sdr.name}</SelectItem>
                       ))}
