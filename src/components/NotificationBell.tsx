@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { AppNotification } from "@/lib/supabase-deals";
 
 export function NotificationBell() {
   const { user } = useAuth();
@@ -16,17 +17,20 @@ export function NotificationBell() {
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
-    if (isOpen && unreadCount > 0) {
-      markAllRead();
-    }
   };
 
-  const handleViewDetails = (notifId: string, dealId?: string) => {
-    markRead(notifId);
+  const handleViewDetails = (notification: AppNotification) => {
+    markRead(notification.id);
     setOpen(false);
+
+    if (notification.prospectId) {
+      navigate(`/prospeccao?prospect=${encodeURIComponent(notification.prospectId)}`);
+      return;
+    }
+
     navigate("/financeiro", {
-      state: dealId
-        ? { scrollToPending: true, dealId }
+      state: notification.dealId
+        ? { scrollToPending: true, dealId: notification.dealId }
         : { scrollToPending: true, scrollToSalary: true },
     });
   };
@@ -111,10 +115,10 @@ export function NotificationBell() {
                         size="sm"
                         variant="outline"
                         className="h-6 text-[10px] px-2 border-border/50 hover:border-primary/50 hover:text-primary"
-                        onClick={() => handleViewDetails(n.id, n.dealId)}
+                        onClick={() => handleViewDetails(n)}
                       >
                         <ExternalLink className="h-3 w-3 mr-1" />
-                        {n.dealId ? "Ver e Confirmar" : "Abrir Financeiro"}
+                        {n.prospectId ? "Abrir card" : n.dealId ? "Ver e Confirmar" : "Abrir Financeiro"}
                       </Button>
                     </div>
                   </div>

@@ -147,6 +147,9 @@ export interface Prospect {
   created_at?: string;
   updated_at?: string;
   has_scheduled_meeting?: boolean;
+  follow_up_at?: string | null;
+  follow_up_note?: string | null;
+  follow_up_notified_at?: string | null;
 }
 
 export interface ProspectNote {

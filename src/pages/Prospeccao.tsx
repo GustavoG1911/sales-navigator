@@ -11,7 +11,9 @@ import {
   ProspectImportItem,
   ProspectImportReport,
   updateProspect,
-  updateProspectStatus,
+  moveProspectToStatus,
+  scheduleProspectFollowUp,
+  completeProspectFollowUp,
   fetchProspectNotes,
   createProspectNote,
   getProspectPersonas,
@@ -35,9 +37,10 @@ import {
   parseProspectImportText,
 } from "@/lib/prospect-import";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProspectFollowUpDialog } from "@/components/ProspectFollowUpDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MessageSquare, Linkedin, Calendar, Building2, UserCircle2, Users2, Settings2, X, GripVertical, Phone, Pencil, ClipboardList, Mail, Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
+import { Plus, MessageSquare, Linkedin, Calendar, CalendarClock, Building2, UserCircle2, Users2, Settings2, X, GripVertical, Phone, Pencil, ClipboardList, Mail, Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
@@ -46,6 +49,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
+import { useSearchParams } from "react-router-dom";
+import { FOLLOW_UP_STATUS, formatFollowUpLabel, getFollowUpState } from "@/lib/prospect-follow-up";
 
 const normalizeUrlKey = (value?: string | null) => {
   const rawValue = (value || "").trim().toLowerCase();
@@ -145,8 +150,8 @@ type ImportUiReport = ProspectImportReport & {
 
 const PROSPECT_OPERATIONS: ProspectOperation[] = ["A definir", "BluePex", "Opus Tech"];
 const OPERATION_FILTERS: Array<ProspectOperation | "Todas"> = ["Todas", ...PROSPECT_OPERATIONS];
-const DEFAULT_FUNNEL_COLUMNS = ["Mapeamento", "Em Contato", "Agendado", "Concluído", "Perdido"];
-const REQUIRED_FUNNEL_COLUMNS = ["Em Contato", "Agendado", "Concluído"];
+const DEFAULT_FUNNEL_COLUMNS = ["Mapeamento", "Em Contato", FOLLOW_UP_STATUS, "Agendado", "Concluído", "Perdido"];
+const REQUIRED_FUNNEL_COLUMNS = ["Em Contato", FOLLOW_UP_STATUS, "Agendado", "Concluído"];
 const KANBAN_AUTO_SCROLL_EDGE = 96;
 const KANBAN_AUTO_SCROLL_MAX_SPEED = 24;
 
@@ -171,12 +176,14 @@ const toCalendarOperation = (operation: ProspectOperation): Operation | undefine
 export default function Prospeccao() {
   const { user, position } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isNewProspectOpen, setIsNewProspectOpen] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [scheduleTargetId, setScheduleTargetId] = useState<string | null>(null);
   const [scheduleTargetCol, setScheduleTargetCol] = useState<string | null>(null);
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
+  const [followUpTarget, setFollowUpTarget] = useState<Prospect | null>(null);
   const [isSheetEditMode, setIsSheetEditMode] = useState(false);
   const [editFormData, setEditFormData] = useState<Partial<Prospect>>({});
   const [draggedProspectId, setDraggedProspectId] = useState<string | null>(null);
@@ -252,6 +259,22 @@ export default function Prospeccao() {
     enabled: !!user?.id,
   });
 
+  React.useEffect(() => {
+    const prospectId = searchParams.get("prospect");
+    if (!prospectId || !prospects) return;
+
+    const prospect = prospects.find((item) => item.id === prospectId);
+    if (prospect) {
+      setSelectedProspect(prospect);
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("prospect");
+    setSearchParams(nextParams, { replace: true });
+    toast.error("O card desta notificação não está mais disponível.");
+  }, [prospects, searchParams, setSearchParams]);
+
   const { data: notes } = useQuery({
     queryKey: ["prospect-notes", selectedProspect?.id],
     queryFn: () => fetchProspectNotes(selectedProspect!.id),
@@ -294,7 +317,8 @@ export default function Prospeccao() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: ProspectStatus }) => updateProspectStatus(id, status),
+    mutationFn: ({ id, status, clearFollowUp }: { id: string; status: ProspectStatus; clearFollowUp?: boolean }) =>
+      moveProspectToStatus(id, status, clearFollowUp),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["prospects"] });
       toast.success("Status atualizado!");
@@ -303,6 +327,44 @@ export default function Prospeccao() {
       const msg = error instanceof Error ? error.message : "Erro desconhecido";
       toast.error(`Erro ao atualizar status: ${msg}`);
     }
+  });
+
+  const scheduleFollowUpMutation = useMutation({
+    mutationFn: ({ id, followUpAt, note }: { id: string; followUpAt: string; note: string }) =>
+      scheduleProspectFollowUp(id, followUpAt, note),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["prospects"] });
+      setSelectedProspect((current) => current?.id === variables.id
+        ? {
+            ...current,
+            status: FOLLOW_UP_STATUS,
+            follow_up_at: variables.followUpAt,
+            follow_up_note: variables.note || null,
+            follow_up_notified_at: null,
+          }
+        : current);
+      setFollowUpTarget(null);
+      toast.success("Retorno agendado com sucesso!");
+    },
+    onError: (error: unknown) => {
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      toast.error(`Erro ao agendar retorno: ${msg}`);
+    },
+  });
+
+  const completeFollowUpMutation = useMutation({
+    mutationFn: (id: string) => completeProspectFollowUp(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["prospects"] });
+      setSelectedProspect((current) => current?.id === id
+        ? { ...current, follow_up_at: null, follow_up_note: null, follow_up_notified_at: null }
+        : current);
+      toast.success("Retorno marcado como realizado.");
+    },
+    onError: (error: unknown) => {
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      toast.error(`Erro ao concluir retorno: ${msg}`);
+    },
   });
 
   const createNoteMutation = useMutation({
@@ -353,6 +415,9 @@ export default function Prospeccao() {
         await updateProspect(scheduleTargetId, {
           status: scheduleTargetCol,
           ...(eventData.operation ? { operation: eventData.operation } : {}),
+          follow_up_at: null,
+          follow_up_note: null,
+          follow_up_notified_at: null,
         });
       }
       return createdEvent;
@@ -788,13 +853,41 @@ export default function Prospeccao() {
   const handleDrop = (e: React.DragEvent, status: string) => {
     e.preventDefault();
     if (draggedProspectId) {
+      const draggedProspect = prospects?.find((prospect) => prospect.id === draggedProspectId);
+      if (!draggedProspect) return;
+
+      if (status.trim().toLowerCase() === FOLLOW_UP_STATUS.toLowerCase()) {
+        setFollowUpTarget(draggedProspect);
+        return;
+      }
+
       if (status.trim().toLowerCase() === "agendado") {
         setScheduleTargetId(draggedProspectId);
         setScheduleTargetCol(status);
         setIsScheduleModalOpen(true);
       } else {
-        updateStatusMutation.mutate({ id: draggedProspectId, status });
+        const clearFollowUp = Boolean(draggedProspect.follow_up_at && status !== FOLLOW_UP_STATUS);
+        if (clearFollowUp) {
+          const confirmed = window.confirm("Este card possui um retorno agendado. Deseja cancelar o lembrete e mover o card?");
+          if (!confirmed) return;
+        }
+        updateStatusMutation.mutate({ id: draggedProspectId, status, clearFollowUp });
       }
+    }
+  };
+
+  const handleSaveFollowUp = (followUpAt: string, note: string) => {
+    if (!followUpTarget) return;
+    scheduleFollowUpMutation.mutate({ id: followUpTarget.id, followUpAt, note });
+  };
+
+  const handleProspectSheetOpenChange = (open: boolean) => {
+    if (open) return;
+    setSelectedProspect(null);
+    if (searchParams.has("prospect")) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("prospect");
+      setSearchParams(nextParams, { replace: true });
     }
   };
 
@@ -1327,6 +1420,14 @@ export default function Prospeccao() {
         </DialogContent>
       </Dialog>
 
+      <ProspectFollowUpDialog
+        open={!!followUpTarget}
+        prospect={followUpTarget}
+        isSaving={scheduleFollowUpMutation.isPending}
+        onOpenChange={(open) => !open && setFollowUpTarget(null)}
+        onSave={handleSaveFollowUp}
+      />
+
       <div
         ref={kanbanScrollRef}
         className="prospect-kanban-scroll flex-1 min-w-0 overflow-x-auto overflow-y-hidden pb-4"
@@ -1376,6 +1477,7 @@ export default function Prospeccao() {
                     colProspects.map((p) => {
                       const personas = getProspectPersonas(p);
                       const primaryPersona = personas[0];
+                      const followUpState = getFollowUpState(p.follow_up_at);
 
                       return (
                         <Card
@@ -1452,6 +1554,30 @@ export default function Prospeccao() {
                               )}
                             </div>
                             )}
+                            <div
+                              onClick={(event) => event.stopPropagation()}
+                              onPointerDown={(event) => event.stopPropagation()}
+                              draggable={false}
+                            >
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className={`h-7 w-full justify-start px-2 text-[10px] ${
+                                  followUpState === "overdue"
+                                    ? "border-destructive/50 text-destructive hover:text-destructive"
+                                    : followUpState === "today"
+                                      ? "border-amber-500/50 text-amber-500 hover:text-amber-500"
+                                      : "border-border/60 text-muted-foreground"
+                                }`}
+                                onClick={() => setFollowUpTarget(p)}
+                              >
+                                <CalendarClock className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">
+                                  {followUpState === "overdue" ? "Atrasado · " : ""}{formatFollowUpLabel(p.follow_up_at)}
+                                </span>
+                              </Button>
+                            </div>
                           </CardContent>
                         </Card>
                       );
@@ -1464,7 +1590,7 @@ export default function Prospeccao() {
         </div>
       </div>
 
-      <Sheet open={!!selectedProspect} onOpenChange={(open) => !open && setSelectedProspect(null)}>
+      <Sheet open={!!selectedProspect} onOpenChange={handleProspectSheetOpenChange}>
         <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0 gap-0">
           {/* Header */}
           <div className="p-6 pb-4 border-b border-border/50">
@@ -1644,6 +1770,53 @@ export default function Prospeccao() {
 
           {/* Body */}
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            {/* Follow-up */}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+                <CalendarClock className="h-3.5 w-3.5" /> Próximo retorno
+              </h3>
+              {selectedProspect?.follow_up_at ? (
+                <div className={`rounded-lg border p-3 ${
+                  getFollowUpState(selectedProspect.follow_up_at) === "overdue"
+                    ? "border-destructive/40 bg-destructive/5"
+                    : "border-border/50 bg-muted/20"
+                }`}>
+                  <p className={`text-sm font-semibold ${
+                    getFollowUpState(selectedProspect.follow_up_at) === "overdue" ? "text-destructive" : "text-foreground"
+                  }`}>
+                    {getFollowUpState(selectedProspect.follow_up_at) === "overdue" ? "Retorno atrasado · " : ""}
+                    {formatFollowUpLabel(selectedProspect.follow_up_at)}
+                  </p>
+                  {selectedProspect.follow_up_note && (
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{selectedProspect.follow_up_note}</p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => setFollowUpTarget(selectedProspect)}>
+                      <CalendarClock className="mr-1.5 h-3.5 w-3.5" /> Reagendar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => completeFollowUpMutation.mutate(selectedProspect.id)}
+                      disabled={completeFollowUpMutation.isPending}
+                    >
+                      <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                      {completeFollowUpMutation.isPending ? "Concluindo..." : "Retorno realizado"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => selectedProspect && setFollowUpTarget(selectedProspect)}
+                >
+                  <CalendarClock className="mr-1.5 h-3.5 w-3.5" /> Agendar retorno
+                </Button>
+              )}
+            </div>
+
             {/* Observations */}
             <div>
               <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">

@@ -325,6 +325,7 @@ export interface AppNotification {
   isTestData: boolean;
   createdAt: string;
   dealId?: string;
+  prospectId?: string;
 }
 
 export async function createNotification(
@@ -364,6 +365,7 @@ export async function fetchNotifications(userId: string): Promise<AppNotificatio
     isTestData: n.is_test_data,
     createdAt: n.created_at,
     dealId: n.deal_id ?? undefined,
+    prospectId: n.prospect_id ?? undefined,
   }));
 }
 

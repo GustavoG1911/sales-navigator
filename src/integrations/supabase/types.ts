@@ -410,31 +410,37 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string | null
+          dedupe_key: string | null
           deal_id: string | null
           id: string
           is_read: boolean | null
           is_test_data: boolean
           message: string
+          prospect_id: string | null
           title: string
           user_id: string | null
         }
         Insert: {
           created_at?: string | null
+          dedupe_key?: string | null
           deal_id?: string | null
           id?: string
           is_read?: boolean | null
           is_test_data?: boolean
           message: string
+          prospect_id?: string | null
           title: string
           user_id?: string | null
         }
         Update: {
           created_at?: string | null
+          dedupe_key?: string | null
           deal_id?: string | null
           id?: string
           is_read?: boolean | null
           is_test_data?: boolean
           message?: string
+          prospect_id?: string | null
           title?: string
           user_id?: string | null
         }
@@ -444,6 +450,13 @@ export type Database = {
             columns: ["deal_id"]
             isOneToOne: false
             referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
             referencedColumns: ["id"]
           },
         ]
@@ -567,6 +580,9 @@ export type Database = {
           contact_name: string
           contact_phone: string | null
           created_at: string
+          follow_up_at: string | null
+          follow_up_note: string | null
+          follow_up_notified_at: string | null
           has_scheduled_meeting: boolean | null
           id: string
           is_test_data: boolean
@@ -587,6 +603,9 @@ export type Database = {
           contact_name: string
           contact_phone?: string | null
           created_at?: string
+          follow_up_at?: string | null
+          follow_up_note?: string | null
+          follow_up_notified_at?: string | null
           has_scheduled_meeting?: boolean | null
           id?: string
           is_test_data?: boolean
@@ -607,6 +626,9 @@ export type Database = {
           contact_name?: string
           contact_phone?: string | null
           created_at?: string
+          follow_up_at?: string | null
+          follow_up_note?: string | null
+          follow_up_notified_at?: string | null
           has_scheduled_meeting?: boolean | null
           id?: string
           is_test_data?: boolean

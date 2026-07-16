@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Prospect, ProspectNote, ProspectPersona, ProspectStatus } from "./types";
 import { getCurrentUserContext } from "./supabase-env";
+import { FOLLOW_UP_STATUS } from "./prospect-follow-up";
 
 export type ProspectImportItem = Partial<Prospect> & {
   importRowNumber: number;
@@ -263,6 +264,66 @@ export const updateProspectStatus = async (id: string, status: ProspectStatus): 
 
   if (error) {
     console.error("Error updating prospect status:", error);
+    throw error;
+  }
+};
+
+export const moveProspectToStatus = async (
+  id: string,
+  status: ProspectStatus,
+  clearFollowUp = false,
+): Promise<void> => {
+  const updates: Record<string, unknown> = { status };
+  if (clearFollowUp) {
+    updates.follow_up_at = null;
+    updates.follow_up_note = null;
+    updates.follow_up_notified_at = null;
+  }
+
+  const { error } = await supabase
+    .from("prospects")
+    .update(updates)
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error moving prospect:", error);
+    throw error;
+  }
+};
+
+export const scheduleProspectFollowUp = async (
+  id: string,
+  followUpAt: string,
+  note: string,
+): Promise<void> => {
+  const { error } = await supabase
+    .from("prospects")
+    .update({
+      status: FOLLOW_UP_STATUS,
+      follow_up_at: followUpAt,
+      follow_up_note: note || null,
+      follow_up_notified_at: null,
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error scheduling prospect follow-up:", error);
+    throw error;
+  }
+};
+
+export const completeProspectFollowUp = async (id: string): Promise<void> => {
+  const { error } = await supabase
+    .from("prospects")
+    .update({
+      follow_up_at: null,
+      follow_up_note: null,
+      follow_up_notified_at: null,
+    })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error completing prospect follow-up:", error);
     throw error;
   }
 };

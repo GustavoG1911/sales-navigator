@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppNotification, fetchNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/supabase-deals";
+import { toast } from "sonner";
 
 export function useNotifications(userId?: string) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -24,15 +25,19 @@ export function useNotifications(userId?: string) {
       .channel(`notifications-${userId.slice(0, 8)}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications" },
-        () => {
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const notification = payload.new as { title?: string; message?: string };
+          toast.info(notification.title || "Nova notificação", {
+            description: notification.message,
+          });
           clearTimeout(debounceTimer.current);
           debounceTimer.current = setTimeout(load, 400);
         }
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "notifications" },
+        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
         () => {
           clearTimeout(debounceTimer.current);
           debounceTimer.current = setTimeout(load, 400);
