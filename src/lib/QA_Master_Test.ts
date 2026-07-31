@@ -24,7 +24,7 @@ async function runTests() {
     // Moking snapshot 
     const mockProfileRate = 0.20;
     const dealVol = 1000;
-    const expectedBaseSnapshot = (dealVol * mockProfileRate) + (0 * 0.4 * mockProfileRate);
+    const expectedBaseSnapshot = ((dealVol * mockProfileRate) + (0 * 0.4 * mockProfileRate)) * 0.8;
     
     const dealMock: any = {
       closingDate: "2026-04-09T12:00:00",
@@ -34,7 +34,7 @@ async function runTests() {
       commission_rate_snapshot: mockProfileRate,
       commission_amount_snapshot: expectedBaseSnapshot
     };
-    assert(dealMock.commission_amount_snapshot === 200, "Base Matemática do snapshot falhou.");
+    assert(dealMock.commission_amount_snapshot === 160, "Base Matemática pós impostos do snapshot falhou.");
     console.log("✅ [SUCCESS] Fluxo Completo de Fechamento (End-to-End Logic)");
 
     // 2. ESTRESSE DIA 7

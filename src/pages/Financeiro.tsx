@@ -43,16 +43,19 @@ function FutureProjectionsAccumulatedCard({ projections, position, onSelectMonth
           </div>
           <div>
             <p className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">Acumulado Lançamentos Futuros</p>
-            <p className="text-xs text-muted-foreground/60 mt-0.5">Previsão total de todos os meses após o atual</p>
+            <p className="text-xs text-muted-foreground/60 mt-0.5">Comissões futuras exibidas como valor pós impostos</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
           {position !== "Diretor" ? (
-             <span className="font-mono text-success font-bold text-sm">{formatCurrency(totalIn)}</span>
+             <div className="text-right">
+               <span className="block text-[10px] text-muted-foreground">Valor pós impostos</span>
+               <span className="font-mono text-success font-bold text-sm">{formatCurrency(totalIn)}</span>
+             </div>
           ) : (
              <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-end md:items-center">
                 <span className="font-mono text-primary text-xs font-semibold">Entradas (In): {formatCurrency(totalIn)}</span>
-                <span className="font-mono text-warning text-xs font-semibold">Saídas (Out): {formatCurrency(totalOut)}</span>
+                <span className="font-mono text-warning text-xs font-semibold">Saídas pós impostos (Out): {formatCurrency(totalOut)}</span>
              </div>
           )}
           {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
@@ -69,11 +72,14 @@ function FutureProjectionsAccumulatedCard({ projections, position, onSelectMonth
                  <div key={proj.monthKey} onClick={(e) => { e.stopPropagation(); onSelectMonth(proj.monthKey); }} className="p-3 bg-muted/20 rounded-lg border border-border/40 cursor-pointer hover:border-primary/50 hover:bg-[#242842]/40 transition-all">
                    <p className="font-semibold uppercase tracking-widest text-[10px] mb-1.5 text-muted-foreground">{formatMonthLabel(proj.monthKey)}</p>
                    {position !== "Diretor" ? (
-                     <p className="font-mono text-success font-bold text-xs">{formatCurrency(proj.projectedIn)}</p>
+                     <div>
+                       <p className="text-[9px] text-muted-foreground">Valor pós impostos</p>
+                       <p className="font-mono text-success font-bold text-xs">{formatCurrency(proj.projectedIn)}</p>
+                     </div>
                    ) : (
                      <div className="flex flex-col gap-1">
                        <p className="font-mono text-primary font-medium text-[10px] flex justify-between"><span>IN:</span> <span>{formatCurrency(proj.projectedIn)}</span></p>
-                       <p className="font-mono text-warning font-medium text-[10px] flex justify-between"><span>OUT:</span> <span>{formatCurrency(proj.projectedOut)}</span></p>
+                       <p className="font-mono text-warning font-medium text-[10px] flex justify-between"><span>OUT pós impostos:</span> <span>{formatCurrency(proj.projectedOut)}</span></p>
                      </div>
                    )}
                  </div>
@@ -382,10 +388,16 @@ function dealHasFinancialMovementInPeriod(deal: Deal, period: FinancePeriod): bo
   return getInstallmentItems(deal, 0).some((item) => monthKeyInPeriod(item.monthKey, period));
 }
 
-function getInstallmentItems(deal: Deal, implantationCommission: number, period?: FinancePeriod) {
+function getInstallmentItems(
+  deal: Deal,
+  implantationCommission: number,
+  period?: FinancePeriod,
+  implantationCommissionBeforeTax = implantationCommission
+) {
   if (!deal.isInstallment || !Array.isArray(deal.installmentDates) || deal.installmentDates.length === 0) return [];
   const count = deal.installmentDates.length || deal.installmentCount || 1;
   const amount = count > 0 ? implantationCommission / count : 0;
+  const amountBeforeTax = count > 0 ? implantationCommissionBeforeTax / count : 0;
   return deal.installmentDates
     .map((inst: any, index: number) => {
       const date = inst?.date || inst;
@@ -399,10 +411,11 @@ function getInstallmentItems(deal: Deal, implantationCommission: number, period?
         paid: !!inst?.paid,
         paymentDate: inst?.paymentDate || inst?.payment_date || null,
         commission: amount,
+        commissionBeforeTax: amountBeforeTax,
         value: count > 0 ? (deal.implantationValue || 0) / count : 0,
       };
     })
-    .filter(Boolean) as Array<{ index: number; date: string; monthKey: string; paid: boolean; paymentDate: string | null; commission: number; value: number }>;
+    .filter(Boolean) as Array<{ index: number; date: string; monthKey: string; paid: boolean; paymentDate: string | null; commission: number; commissionBeforeTax: number; value: number }>;
 }
 
 function getCommissionPeriodParts(deal: Deal, presentations: any, settings: any, period: FinancePeriod) {
@@ -410,20 +423,31 @@ function getCommissionPeriodParts(deal: Deal, presentations: any, settings: any,
   const presCount = getPresentationsForDeal(deal, presentations);
   const comm = calculateCommission(deal, presCount, settings, false);
   const mensalidadeInPeriod = monthKeyInPeriod(mensalidadeMonthKey, period);
-  const installmentItems = getInstallmentItems(deal, comm.implantationCommission, period);
+  const installmentItems = getInstallmentItems(
+    deal,
+    comm.implantationCommission,
+    period,
+    comm.implantationCommissionBeforeTax
+  );
   const implantacaoInPeriod = deal.isInstallment ? installmentItems.length > 0 : monthKeyInPeriod(implantacaoMonthKey, period);
   const mensalidadeCommission = mensalidadeInPeriod ? comm.monthlyCommission + comm.superMetaBonus : 0;
+  const mensalidadeCommissionBeforeTax = mensalidadeInPeriod
+    ? comm.monthlyCommissionBeforeTax + comm.superMetaBonusBeforeTax
+    : 0;
   const implantacaoCommission = deal.isInstallment
     ? installmentItems.reduce((acc, item) => acc + item.commission, 0)
     : implantacaoInPeriod ? comm.implantationCommission : 0;
+  const implantacaoCommissionBeforeTax = deal.isInstallment
+    ? installmentItems.reduce((acc, item) => acc + item.commissionBeforeTax, 0)
+    : implantacaoInPeriod ? comm.implantationCommissionBeforeTax : 0;
   const hasMensalidadeCommission = mensalidadeCommission > 0;
   const hasImplantacaoCommission = implantacaoCommission > 0;
   const labels = [
-    mensalidadeCommission > 0 ? `Mensalidade: ${formatCurrency(mensalidadeCommission)}` : null,
+    mensalidadeCommission > 0 ? `Mensalidade - Valor pós impostos: ${formatCurrency(mensalidadeCommission)}` : null,
     ...(
       deal.isInstallment
-        ? installmentItems.map((item) => `Implantacao ${item.index + 1}/${deal.installmentCount || installmentItems.length}: ${formatCurrency(item.commission)}`)
-        : [implantacaoCommission > 0 ? `Implantacao: ${formatCurrency(implantacaoCommission)}` : null]
+        ? installmentItems.map((item) => `Implantacao ${item.index + 1}/${deal.installmentCount || installmentItems.length} - Valor pós impostos: ${formatCurrency(item.commission)}`)
+        : [implantacaoCommission > 0 ? `Implantacao - Valor pós impostos: ${formatCurrency(implantacaoCommission)}` : null]
     ),
   ].filter(Boolean) as string[];
 
@@ -434,9 +458,13 @@ function getCommissionPeriodParts(deal: Deal, presentations: any, settings: any,
     mensalidadeInPeriod,
     implantacaoInPeriod,
     mensalidadeCommission,
+    mensalidadeCommissionBeforeTax,
     implantacaoCommission,
+    implantacaoCommissionBeforeTax,
     installmentItems,
     total: mensalidadeCommission + implantacaoCommission,
+    totalBeforeTax: mensalidadeCommissionBeforeTax + implantacaoCommissionBeforeTax,
+    taxAmount: (mensalidadeCommissionBeforeTax + implantacaoCommissionBeforeTax) - (mensalidadeCommission + implantacaoCommission),
     labels,
     unlocked: (hasMensalidadeCommission || hasImplantacaoCommission)
       && (!hasMensalidadeCommission || !!deal.isMensalidadePaidByClient)
@@ -545,7 +573,7 @@ function ExpandableUserCommissionRow({ deal, selectedMonth, presentations, setti
   const presCount = getPresentationsForDeal(deal, presentations);
   const allMensalidadeCommission = comm.monthlyCommission + comm.superMetaBonus;
   const totalComm = inPendingSection ? comm.totalCommission : parts.total;
-  const periodBaseCommission = (parts.mensalidadeInPeriod ? comm.monthlyCommission : 0) + (parts.implantacaoInPeriod ? comm.implantationCommission : 0);
+  const totalCommBeforeTax = inPendingSection ? comm.totalCommissionBeforeTax : parts.totalBeforeTax;
   const periodSuperMetaBonus = parts.mensalidadeInPeriod ? comm.superMetaBonus : 0;
   const dealMonth = selectedMonth || mensalidadeMonthKey || implantacaoMonthKey;
   const relevantCommissionPayments = getCommissionPaymentsForParts(deal.id, parts, commissionPayments || []);
@@ -553,8 +581,8 @@ function ExpandableUserCommissionRow({ deal, selectedMonth, presentations, setti
   const commissionPaidDateLabel = formatDateList(relevantCommissionPayments.map((cp) => cp.paidByDirectorAt));
   const isPendingAction = commissionStatus === "waiting";
   const pendingPartLabels = [
-    allMensalidadeCommission > 0 ? `Mensalidade${mensalidadeMonthKey ? ` (${formatMonthLabel(mensalidadeMonthKey)})` : ""}: ${formatCurrency(allMensalidadeCommission)}` : null,
-    comm.implantationCommission > 0 ? `Implantacao${implantacaoMonthKey ? ` (${formatMonthLabel(implantacaoMonthKey)})` : ""}: ${formatCurrency(comm.implantationCommission)}` : null,
+    allMensalidadeCommission > 0 ? `Mensalidade${mensalidadeMonthKey ? ` (${formatMonthLabel(mensalidadeMonthKey)})` : ""} - Valor pós impostos: ${formatCurrency(allMensalidadeCommission)}` : null,
+    comm.implantationCommission > 0 ? `Implantacao${implantacaoMonthKey ? ` (${formatMonthLabel(implantacaoMonthKey)})` : ""} - Valor pós impostos: ${formatCurrency(comm.implantationCommission)}` : null,
   ].filter(Boolean) as string[];
   const commissionParts = (inPendingSection ? pendingPartLabels : parts.labels).join(" + ");
   const periodLabel = inPendingSection && pendingPartLabels.length > 1
@@ -593,17 +621,28 @@ function ExpandableUserCommissionRow({ deal, selectedMonth, presentations, setti
           </TableCell>
         ) : (
           <TableCell className="px-4 py-3 text-right text-sm font-mono font-semibold text-foreground/90">
-            {parts.mensalidadeCommission > 0 ? formatCurrency(parts.mensalidadeCommission) : "—"}
+            {parts.mensalidadeCommission > 0 ? (
+              <>
+                <span className="block text-primary">{formatCurrency(parts.mensalidadeCommission)}</span>
+                <span className="block text-[10px] text-muted-foreground/60">Sem impostos: {formatCurrency(parts.mensalidadeCommissionBeforeTax)}</span>
+              </>
+            ) : "—"}
           </TableCell>
         )}
         {inPendingSection ? (
           <TableCell className="px-4 py-3 text-right">
             <div className="text-sm font-mono font-semibold text-warning">{formatCurrency(totalComm)}</div>
+            <div className="text-[10px] text-muted-foreground/70">Valor pós impostos · Sem impostos: {formatCurrency(totalCommBeforeTax)}</div>
             <div className="text-[10px] text-warning/70 leading-tight mt-1">{commissionParts || "Comissao do fechamento"}</div>
           </TableCell>
         ) : (
           <TableCell className="px-4 py-3 text-right text-sm font-mono font-semibold text-foreground/90">
-            {parts.implantacaoCommission > 0 ? formatCurrency(parts.implantacaoCommission) : "—"}
+            {parts.implantacaoCommission > 0 ? (
+              <>
+                <span className="block text-primary">{formatCurrency(parts.implantacaoCommission)}</span>
+                <span className="block text-[10px] text-muted-foreground/60">Sem impostos: {formatCurrency(parts.implantacaoCommissionBeforeTax)}</span>
+              </>
+            ) : "—"}
           </TableCell>
         )}
         <TableCell className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
@@ -640,13 +679,22 @@ function ExpandableUserCommissionRow({ deal, selectedMonth, presentations, setti
                 <p className="font-mono font-semibold text-foreground/90">{formatCurrency(deal.implantationValue || 0)}</p>
               </div>
               <div className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-1">
-                <p className="text-muted-foreground">Comissão Base</p>
-                <p className="font-mono font-semibold text-primary">{formatCurrency(periodBaseCommission)}</p>
+                <p className="text-muted-foreground">Valor sem impostos</p>
+                <p className="font-mono font-semibold text-foreground/90">{formatCurrency(totalCommBeforeTax)}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 space-y-1">
+                <p className="text-destructive/80">Impostos ({Math.round(comm.taxRate * 100)}%)</p>
+                <p className="font-mono font-semibold text-destructive">− {formatCurrency(totalCommBeforeTax - totalComm)}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 space-y-1">
+                <p className="text-primary/80">Valor pós impostos</p>
+                <p className="font-mono font-semibold text-primary">{formatCurrency(totalComm)}</p>
               </div>
               {inPendingSection && (
                 <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 space-y-1 col-span-2">
                   <p className="text-warning/80">Pago pelo gestor</p>
                   <p className="font-mono font-semibold text-warning">{formatCurrency(totalComm)}</p>
+                  <p className="text-[10px] text-warning/70">Valor pós impostos · Valor sem impostos: {formatCurrency(totalCommBeforeTax)}</p>
                   <p className="text-[10px] text-warning/70">Pago em {commissionPaidDateLabel}</p>
                   <p className="text-[10px] text-warning/70">{commissionParts || "Comissao do fechamento"}</p>
                 </div>
@@ -655,6 +703,7 @@ function ExpandableUserCommissionRow({ deal, selectedMonth, presentations, setti
                 <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 space-y-1">
                   <p className="text-warning/80">Bônus Super Meta</p>
                   <p className="font-mono font-semibold text-warning">+{formatCurrency(periodSuperMetaBonus)}</p>
+                  <p className="text-[10px] text-warning/70">Valor pós impostos · Sem impostos: {formatCurrency(comm.superMetaBonusBeforeTax)}</p>
                 </div>
               ) : (
                 <div className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-1">
@@ -1292,8 +1341,8 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard title="Comissão Paga" value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" subtitle="Já confirmada e recebida" tooltip="Comissões confirmadas dentro do mês financeiro previsto. A data real do pagamento aparece no detalhe." />
-        <KpiCard title="Comissão Prevista" value={formatCurrency(kpis.projected)} icon={TrendingUp} variant="primary" subtitle="Esperado receber neste mês pela Regra do Dia 07" tooltip="Comissões liberadas ou previstas para o mês financeiro selecionado, respeitando a Regra do Dia 07." />
+        <KpiCard title="Comissão Paga" value={formatCurrency(kpis.paid)} icon={BadgeDollarSign} variant="success" subtitle="Valor pós impostos · já recebida" tooltip="Exibe o valor pós impostos, com o desconto fixo de 20% já aplicado. A data real do pagamento aparece no detalhe." />
+        <KpiCard title="Comissão Prevista" value={formatCurrency(kpis.projected)} icon={TrendingUp} variant="primary" subtitle="Valor pós impostos · Regra do Dia 07" tooltip="Exibe o valor pós impostos das comissões previstas para o mês financeiro selecionado." />
         <KpiCard title="Volume de Vendas" value={formatCurrency(kpis.volume)} icon={BarChart3} variant="warning" subtitle="Valor bruto dos contratos do período" tooltip="Soma dos valores dos contratos com competência no período. Em implantação parcelada, considera apenas a parcela do mês." />
         <KpiCard title="Salário Fixo" value={formatCurrency(kpis.fixed)} icon={DollarSign} variant={kpis.fixedConfirmed ? "success" : "default"} subtitle={kpis.fixedConfirmed ? "Recebimento confirmado" : "Vencimento no mês selecionado"} tooltip="Salário fixo com vencimento no mês selecionado. A competência exibida na linha é o mês trabalhado." />
       </div>
@@ -1370,7 +1419,12 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                       {deal.operation} · {cp.component === "mensalidade" ? "Comissão de mensalidade" : "Comissão de implantação"} · {formatMonthLabel(cp.competenceMonth)}
                     </p>
                   </div>
-                  <p className="font-mono font-bold text-warning">{formatCurrency(cp.amount)}</p>
+                  <div className="text-right">
+                    <p className="text-[10px] text-muted-foreground">Valor pós impostos</p>
+                    <p className="font-mono font-bold text-warning">{formatCurrency(cp.amount)}</p>
+                    <p className="text-[10px] text-muted-foreground">Valor sem impostos: {formatCurrency(cp.amountBeforeTax)}</p>
+                    <p className="text-[10px] text-muted-foreground">Impostos ({Math.round(cp.taxRate * 100)}%): − {formatCurrency(cp.taxAmount)}</p>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                   <div className="rounded-md bg-card/60 border border-border/40 p-3">
@@ -1382,8 +1436,9 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                     <p className="font-mono font-semibold mt-1">{formatSafeDate(cp.paidByDirectorAt, "dd/MM/yyyy HH:mm")}</p>
                   </div>
                   <div className="rounded-md bg-card/60 border border-border/40 p-3">
-                    <p className="text-muted-foreground">Valor informado</p>
+                    <p className="text-muted-foreground">Valor pós impostos informado</p>
                     <p className="font-mono font-semibold mt-1">{formatCurrency(cp.amount)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Valor sem impostos: {formatCurrency(cp.amountBeforeTax)}</p>
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 justify-end">
@@ -1416,7 +1471,7 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                 <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Cliente</TableHead>
                 <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Operação</TableHead>
                 <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Mês</TableHead>
-                <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Comissão Total</TableHead>
+                <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Valor pós impostos</TableHead>
                 <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-center">Ação</TableHead>
               </TableRow>
             </TableHeader>
@@ -1458,8 +1513,8 @@ function UserFinanceiroContent({ userId }: { userId: string }) {
                 <TableHead className="w-[30px] px-2"></TableHead>
                 <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Cliente</TableHead>
                 <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Operação</TableHead>
-                <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Com. Mensalidade</TableHead>
-                <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Com. Implantação</TableHead>
+                <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Mensalidade pós impostos</TableHead>
+                <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Implantação pós impostos</TableHead>
                 <TableHead className="px-4 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-center">Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -2037,14 +2092,56 @@ function FinanceiroContent() {
       ) => {
         if (!recipientUserId) return;
         if (parts.mensalidadeInPeriod && parts.mensalidadeCommission > 0 && parts.mensalidadeMonthKey) {
-          await upsertCommissionPaymentRow(dealId, "mensalidade", parts.mensalidadeMonthKey, parts.mensalidadeCommission, isTestData, recipientUserId, null, paidAt);
+          await upsertCommissionPaymentRow(
+            dealId,
+            "mensalidade",
+            parts.mensalidadeMonthKey,
+            parts.mensalidadeCommission,
+            isTestData,
+            recipientUserId,
+            null,
+            paidAt,
+            {
+              amountBeforeTax: parts.mensalidadeCommissionBeforeTax,
+              taxRate: parts.comm.taxRate,
+              taxAmount: parts.mensalidadeCommissionBeforeTax - parts.mensalidadeCommission,
+            }
+          );
         }
         if (parts.installmentItems?.length) {
           for (const item of parts.installmentItems) {
-            await upsertCommissionPaymentRow(dealId, "implantacao_parcela", item.monthKey, item.commission, isTestData, recipientUserId, item.index, paidAt);
+            await upsertCommissionPaymentRow(
+              dealId,
+              "implantacao_parcela",
+              item.monthKey,
+              item.commission,
+              isTestData,
+              recipientUserId,
+              item.index,
+              paidAt,
+              {
+                amountBeforeTax: item.commissionBeforeTax,
+                taxRate: parts.comm.taxRate,
+                taxAmount: item.commissionBeforeTax - item.commission,
+              }
+            );
           }
         } else if (parts.implantacaoInPeriod && parts.implantacaoCommission > 0 && parts.implantacaoMonthKey) {
-          await upsertCommissionPaymentRow(dealId, "implantacao", parts.implantacaoMonthKey, parts.implantacaoCommission, isTestData, recipientUserId, null, paidAt);
+          await upsertCommissionPaymentRow(
+            dealId,
+            "implantacao",
+            parts.implantacaoMonthKey,
+            parts.implantacaoCommission,
+            isTestData,
+            recipientUserId,
+            null,
+            paidAt,
+            {
+              amountBeforeTax: parts.implantacaoCommissionBeforeTax,
+              taxRate: parts.comm.taxRate,
+              taxAmount: parts.implantacaoCommissionBeforeTax - parts.implantacaoCommission,
+            }
+          );
         }
       };
       const clearPartsForRecipient = async (
@@ -2472,8 +2569,8 @@ function FinanceiroContent() {
           value={formatCurrency(kpis.totalPago)}
           icon={CheckCircle2}
           variant="success"
-          subtitle="Já confirmada e recebida"
-          tooltip="Comissões que os funcionários já confirmaram como recebidas."
+          subtitle="Valor pós impostos · já recebida"
+          tooltip="Comissões que os funcionários já confirmaram como recebidas, com o desconto fixo de 20% aplicado."
           onClick={() => setKpiModalType("pago")}
         />
         <KpiCard
@@ -2481,8 +2578,8 @@ function FinanceiroContent() {
           value={formatCurrency(kpis.totalProjetado)}
           icon={ArrowDownToLine}
           variant="warning"
-          subtitle="Esperado receber neste mês pela Regra do Dia 07"
-          tooltip="Comissões ainda previstas ou aguardando confirmação, separadas por funcionário, componente e mês financeiro."
+          subtitle="Valor pós impostos · Regra do Dia 07"
+          tooltip="Comissões pós impostos ainda previstas ou aguardando confirmação, separadas por funcionário, componente e mês financeiro."
           onClick={() => setKpiModalType("projetado")}
         />
         <KpiCard
@@ -2629,7 +2726,8 @@ function FinanceiroContent() {
                     <TableHead className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Cliente</TableHead>
                     <TableHead className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Operação</TableHead>
                     <TableHead className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Executivo</TableHead>
-                    <TableHead className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Comissão</TableHead>
+                    <TableHead className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Valor sem impostos</TableHead>
+                    <TableHead className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Valor pós impostos</TableHead>
                     <TableHead className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-center">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -2650,6 +2748,7 @@ function FinanceiroContent() {
                           <TableCell className="text-sm font-medium">{d.clientName}</TableCell>
                           <TableCell><Badge variant="outline" className="text-[10px] border-border/40">{d.operation}</Badge></TableCell>
                           <TableCell className="text-sm">{getUserName(d.userId)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-foreground/80">{formatCurrency(parts.totalBeforeTax)}</TableCell>
                           <TableCell className="text-right font-mono font-bold text-primary">{formatCurrency(parts.total)}</TableCell>
                           <TableCell className="text-center">
                             {status === "done" ? (
@@ -3197,7 +3296,6 @@ function ExpandableCommissionRow({ deal, recipientUserId, settings, profiles, ge
 
   const comm = parts.comm;
   const dealComiss = parts.total;
-  const periodBaseCommission = (parts.mensalidadeInPeriod ? comm.monthlyCommission : 0) + (parts.implantacaoInPeriod ? comm.implantationCommission : 0);
   const periodSuperMetaBonus = parts.mensalidadeInPeriod ? comm.superMetaBonus : 0;
 
   return (
@@ -3221,7 +3319,8 @@ function ExpandableCommissionRow({ deal, recipientUserId, settings, profiles, ge
           <Badge variant="outline" className="text-[10px] border-border/40">{deal.operation}</Badge>
         </TableCell>
         <TableCell className="px-3 py-3 text-right text-sm font-mono font-bold text-primary">
-          {formatCurrency(dealComiss)}
+          <span className="block">{formatCurrency(dealComiss)}</span>
+          <span className="block text-[10px] font-normal text-muted-foreground/60">Sem impostos: {formatCurrency(parts.totalBeforeTax)}</span>
         </TableCell>
         <TableCell className="px-3 py-3 text-sm text-muted-foreground text-center tabular-nums font-mono">
           {expectedPaymentDateStr}
@@ -3307,8 +3406,16 @@ function ExpandableCommissionRow({ deal, recipientUserId, settings, profiles, ge
                 <p className="font-mono font-semibold text-foreground/90">{formatCurrency(deal.implantationValue)}</p>
               </div>
               <div className="p-3 rounded-lg bg-muted/30 border border-border/30 space-y-1">
-                <p className="text-muted-foreground">Comissão Base</p>
-                <p className="font-mono font-semibold text-primary">{formatCurrency(periodBaseCommission)}</p>
+                <p className="text-muted-foreground">Valor sem impostos</p>
+                <p className="font-mono font-semibold text-foreground/90">{formatCurrency(parts.totalBeforeTax)}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 space-y-1">
+                <p className="text-destructive/80">Impostos ({Math.round(comm.taxRate * 100)}%)</p>
+                <p className="font-mono font-semibold text-destructive">− {formatCurrency(parts.taxAmount)}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 space-y-1">
+                <p className="text-primary/80">Valor pós impostos</p>
+                <p className="font-mono font-semibold text-primary">{formatCurrency(dealComiss)}</p>
               </div>
               {hasDirectorPayment && (
                 <div className="p-3 rounded-lg bg-success/10 border border-success/20 space-y-1">
@@ -3395,7 +3502,7 @@ function PayablesTab({ deals, salaries, manualPayments, profiles, getUserName, p
               <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Funcionario</TableHead>
               <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Cliente</TableHead>
               <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Operação</TableHead>
-              <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Comissão do Período</TableHead>
+              <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-right">Comissão pós impostos</TableHead>
               <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-center">Data Prevista</TableHead>
               <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-center">Baixa</TableHead>
               <TableHead className="px-3 py-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase text-center w-[120px]">Status</TableHead>

@@ -1,6 +1,15 @@
 import { CommissionBreakdown, Deal, AppSettings, MonthlyPresentations, GlobalParameters } from "./types";
 
 const DEFAULT_COMMISSION_RATE = 0.20;
+export const COMMISSION_TAX_RATE = 0.20;
+
+function roundCurrency(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+export function getCommissionValueBeforeTax(valueAfterTax: number): number {
+  return roundCurrency(valueAfterTax / (1 - COMMISSION_TAX_RATE));
+}
 
 /**
  * Get the commission tier rate based on presentations vs thresholds.
@@ -38,25 +47,45 @@ export function calculateCommission(
   const tier = getCommissionTier(presentationsForOperation, metaThreshold, superMetaThreshold);
   const baseRate = Math.min(tier.rate, 1.0); // base is capped at 1.0 for the monthly calc
   const monthlyBase = deal.monthlyValue * baseRate;
-  const monthlyCommission = monthlyBase * rate;
+  const monthlyCommissionBeforeTax = roundCurrency(monthlyBase * rate);
+  const monthlyTaxAmount = roundCurrency(monthlyCommissionBeforeTax * COMMISSION_TAX_RATE);
+  const monthlyCommission = roundCurrency(monthlyCommissionBeforeTax - monthlyTaxAmount);
 
   const implantationBase = deal.implantationValue * 0.4;
-  const implantationCommission = implantationBase * rate;
+  const implantationCommissionBeforeTax = roundCurrency(implantationBase * rate);
+  const implantationTaxAmount = roundCurrency(implantationCommissionBeforeTax * COMMISSION_TAX_RATE);
+  const implantationCommission = roundCurrency(implantationCommissionBeforeTax - implantationTaxAmount);
 
   // Super meta bonus: when tier is 2.0, the commission doubles (add another 1x)
-  let superMetaBonus = 0;
+  let superMetaBonusBeforeTax = 0;
   if (tier.rate >= 2.0) {
-    superMetaBonus = monthlyCommission; // doubles the monthly commission
+    superMetaBonusBeforeTax = monthlyCommissionBeforeTax; // doubles the monthly commission
   }
+  const superMetaTaxAmount = roundCurrency(superMetaBonusBeforeTax * COMMISSION_TAX_RATE);
+  const superMetaBonus = roundCurrency(superMetaBonusBeforeTax - superMetaTaxAmount);
+  const totalCommissionBeforeTax = roundCurrency(
+    monthlyCommissionBeforeTax + implantationCommissionBeforeTax + superMetaBonusBeforeTax
+  );
+  const taxAmount = roundCurrency(monthlyTaxAmount + implantationTaxAmount + superMetaTaxAmount);
+  const totalCommission = roundCurrency(monthlyCommission + implantationCommission + superMetaBonus);
 
   return {
     monthlyBase,
     monthlyBaseRate: baseRate,
+    monthlyCommissionBeforeTax,
+    monthlyTaxAmount,
     monthlyCommission,
     implantationBase,
+    implantationCommissionBeforeTax,
+    implantationTaxAmount,
     implantationCommission,
+    superMetaBonusBeforeTax,
+    superMetaTaxAmount,
     superMetaBonus,
-    totalCommission: monthlyCommission + implantationCommission + superMetaBonus,
+    totalCommissionBeforeTax,
+    taxAmount,
+    taxRate: COMMISSION_TAX_RATE,
+    totalCommission,
     commissionRate: rate,
   };
 }

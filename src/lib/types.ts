@@ -81,10 +81,19 @@ export interface GlobalParameters {
 export interface CommissionBreakdown {
   monthlyBase: number;
   monthlyBaseRate: number; // 1.0 or 0.7
+  monthlyCommissionBeforeTax: number;
+  monthlyTaxAmount: number;
   monthlyCommission: number;
   implantationBase: number;
+  implantationCommissionBeforeTax: number;
+  implantationTaxAmount: number;
   implantationCommission: number;
+  superMetaBonusBeforeTax: number;
+  superMetaTaxAmount: number;
   superMetaBonus: number;
+  totalCommissionBeforeTax: number;
+  taxAmount: number;
+  taxRate: number;
   totalCommission: number;
   commissionRate: number; // e.g. 0.20
 }

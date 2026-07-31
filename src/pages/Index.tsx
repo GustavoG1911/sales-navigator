@@ -170,6 +170,7 @@ export default function Index() {
 
   const kpis = useMemo(() => {
     let comissaoFechamentos = 0;
+    let comissaoFechamentosSemImpostos = 0;
     let volumeFechamentos = 0;
     closedDeals.forEach(deal => {
       volumeFechamentos += (deal.monthlyValue || 0) + (deal.implantationValue || 0);
@@ -178,14 +179,17 @@ export default function Index() {
       const presCount = getPresentationsForDeal(deal, optimisticPresentations);
       const comm = calculateCommission(deal, presCount, settings, false);
       comissaoFechamentos += comm.totalCommission;
+      comissaoFechamentosSemImpostos += comm.totalCommissionBeforeTax;
     });
     const ticketMedio = closedDeals.length > 0 ? volumeFechamentos / closedDeals.length : 0;
 
     let receitaPrevista = 0;
+    let receitaPrevistaSemImpostos = 0;
     commissionFinancialDeals.forEach(deal => {
       const presCount = getPresentationsForDeal(deal, optimisticPresentations);
       const comm = calculateCommission(deal, presCount, settings, false);
       receitaPrevista += comm.totalCommission;
+      receitaPrevistaSemImpostos += comm.totalCommissionBeforeTax;
     });
 
     return [
@@ -201,13 +205,13 @@ export default function Index() {
       },
       {
         title: "Comissão Gerada",
-        subtitle: "Resultado dos fechamentos",
+        subtitle: `Valor pós impostos · Valor sem impostos: ${formatCurrency(comissaoFechamentosSemImpostos)}`,
         value: comissaoFechamentos,
         type: "currency" as const,
         icon: TrendingUp,
         variant: "primary" as const,
         modalType: "projected" as "projected" | "paid" | "deals" | "volume" | null,
-        tooltip: "Soma a comissão dos contratos assinados no período, usando metas, apresentações e percentuais configurados."
+        tooltip: "Exibe o valor pós impostos. O valor sem impostos é a comissão calculada antes do desconto fixo de 20%."
       },
       {
         title: "Volume Bruto",
@@ -221,13 +225,13 @@ export default function Index() {
       },
       {
         title: "Receita Prevista",
-        subtitle: "Comissões pela Regra do Dia 07",
+        subtitle: `Valor pós impostos · Valor sem impostos: ${formatCurrency(receitaPrevistaSemImpostos)}`,
         value: receitaPrevista,
         type: "currency" as const,
         icon: BadgeDollarSign,
         variant: "warning" as const,
         modalType: null,
-        tooltip: "Comissão com competência financeira no mês selecionado. Pagamentos após o dia 07 entram no mês seguinte."
+        tooltip: "Comissão pós impostos com competência financeira no mês selecionado. Pagamentos após o dia 07 entram no mês seguinte."
       },
       {
         title: "Ticket Médio",

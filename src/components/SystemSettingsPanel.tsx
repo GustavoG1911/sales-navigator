@@ -228,7 +228,7 @@ export function SystemSettingsPanel() {
           <div className="p-3 rounded-lg bg-muted/50">
             <p className="text-xs font-medium mb-1">Resumo da Fórmula</p>
             <p className="text-[11px] text-muted-foreground font-mono">
-              Comissão = (Mensalidade × [70% ou 100%] × {commissionRate}%) + (Implantação × {implantationRate}% × {commissionRate}%)
+              Valor sem impostos = (Mensalidade × [70% ou 100%] × {commissionRate}%) + (Implantação × {implantationRate}% × {commissionRate}%). Valor pós impostos = resultado com desconto fixo de 20%.
             </p>
           </div>
 

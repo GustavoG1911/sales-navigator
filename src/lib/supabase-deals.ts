@@ -392,6 +392,9 @@ export interface CommissionPayment {
   component: "mensalidade" | "implantacao" | "implantacao_parcela";
   competenceMonth: string;
   installmentIndex: number | null;
+  amountBeforeTax: number;
+  taxRate: number;
+  taxAmount: number;
   amount: number;
   recipientUserId: string | null;
   paidByDirectorAt: string | null;
@@ -403,13 +406,18 @@ export interface CommissionPayment {
 }
 
 function dbToCommissionPayment(cp: any): CommissionPayment {
+  const amount = Number(cp.amount ?? 0);
+  const amountBeforeTax = Number(cp.amount_before_tax ?? amount);
   return {
     id: cp.id,
     dealId: cp.deal_id,
     component: cp.component,
     competenceMonth: cp.competence_month,
     installmentIndex: cp.installment_index ?? null,
-    amount: Number(cp.amount ?? 0),
+    amountBeforeTax,
+    taxRate: Number(cp.tax_rate ?? 0),
+    taxAmount: Number(cp.tax_amount ?? Math.max(0, amountBeforeTax - amount)),
+    amount,
     recipientUserId: cp.recipient_user_id ?? null,
     paidByDirectorAt: cp.paid_by_director_at ?? null,
     confirmedByUserAt: cp.confirmed_by_user_at ?? null,
@@ -430,7 +438,8 @@ export async function upsertCommissionPaymentRow(
   isTestData: boolean,
   recipientUserId: string,
   installmentIndex?: number | null,
-  paidAtIso?: string
+  paidAtIso?: string,
+  taxBreakdown?: { amountBeforeTax: number; taxRate: number; taxAmount: number }
 ): Promise<void> {
   const now = new Date().toISOString();
   const paidAt = paidAtIso || now;
@@ -442,6 +451,9 @@ export async function upsertCommissionPaymentRow(
         component,
         competence_month: competenceMonth,
         installment_index: installmentIndex ?? null,
+        amount_before_tax: taxBreakdown?.amountBeforeTax ?? amount,
+        tax_rate: taxBreakdown?.taxRate ?? 0,
+        tax_amount: taxBreakdown?.taxAmount ?? 0,
         amount,
         recipient_user_id: recipientUserId,
         paid_by_director_at: paidAt,

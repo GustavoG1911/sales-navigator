@@ -136,6 +136,7 @@ export type Database = {
       commission_payments: {
         Row: {
           amount: number
+          amount_before_tax: number | null
           competence_month: string
           component: string
           confirmed_by_user_at: string | null
@@ -148,10 +149,13 @@ export type Database = {
           paid_by_director_at: string | null
           recipient_user_id: string | null
           rejected_by_user_at: string | null
+          tax_amount: number
+          tax_rate: number
           updated_at: string
         }
         Insert: {
           amount: number
+          amount_before_tax?: number | null
           competence_month: string
           component: string
           confirmed_by_user_at?: string | null
@@ -164,10 +168,13 @@ export type Database = {
           paid_by_director_at?: string | null
           recipient_user_id?: string | null
           rejected_by_user_at?: string | null
+          tax_amount?: number
+          tax_rate?: number
           updated_at?: string
         }
         Update: {
           amount?: number
+          amount_before_tax?: number | null
           competence_month?: string
           component?: string
           confirmed_by_user_at?: string | null
@@ -180,6 +187,8 @@ export type Database = {
           paid_by_director_at?: string | null
           recipient_user_id?: string | null
           rejected_by_user_at?: string | null
+          tax_amount?: number
+          tax_rate?: number
           updated_at?: string
         }
         Relationships: [

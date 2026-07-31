@@ -58,28 +58,49 @@ function CommissionDetail({ deal, comm }: { deal: Deal; comm: ReturnType<typeof 
       <p className="section-label">Detalhamento do Cálculo</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="p-3 rounded-lg bg-card/60 border border-border/30">
+          <span className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Valor sem impostos</span>
           <span className="text-muted-foreground">Mensalidade: </span>
           <span className="text-foreground font-mono">{formatCurrency(deal.monthlyValue)}</span>
           <span className="text-muted-foreground"> × {basePercent} × {ratePercent} = </span>
-          <span className="font-bold text-primary">{formatCurrency(comm.monthlyCommission)}</span>
+          <span className="font-bold text-foreground">{formatCurrency(comm.monthlyCommissionBeforeTax)}</span>
+          <div className="mt-2 flex items-center justify-between border-t border-border/25 pt-2">
+            <span className="text-muted-foreground">Valor pós impostos</span>
+            <span className="font-bold text-primary font-mono">{formatCurrency(comm.monthlyCommission)}</span>
+          </div>
         </div>
         <div className="p-3 rounded-lg bg-card/60 border border-border/30">
+          <span className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Valor sem impostos</span>
           <span className="text-muted-foreground">Implantação: </span>
           <span className="text-foreground font-mono">{formatCurrency(deal.implantationValue)}</span>
           <span className="text-muted-foreground"> × 40% × {ratePercent} = </span>
-          <span className="font-bold text-primary">{formatCurrency(comm.implantationCommission)}</span>
+          <span className="font-bold text-foreground">{formatCurrency(comm.implantationCommissionBeforeTax)}</span>
+          <div className="mt-2 flex items-center justify-between border-t border-border/25 pt-2">
+            <span className="text-muted-foreground">Valor pós impostos</span>
+            <span className="font-bold text-primary font-mono">{formatCurrency(comm.implantationCommission)}</span>
+          </div>
         </div>
       </div>
-      {comm.superMetaBonus > 0 && (
+      {comm.superMetaBonusBeforeTax > 0 && (
         <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 flex items-center gap-2">
           <Zap className="h-3.5 w-3.5 text-warning shrink-0" />
           <span className="text-warning font-semibold">Bônus Super Meta:</span>
-          <span className="font-bold text-warning font-mono ml-auto">{formatCurrency(comm.superMetaBonus)}</span>
+          <span className="text-warning/80 ml-auto">Valor sem impostos {formatCurrency(comm.superMetaBonusBeforeTax)}</span>
+          <span className="font-bold text-warning font-mono">Valor pós impostos {formatCurrency(comm.superMetaBonus)}</span>
         </div>
       )}
-      <div className="pt-2 border-t border-border/25 flex items-center justify-between">
-        <span className="text-muted-foreground text-xs">Total Comissão</span>
-        <span className="font-bold text-primary text-sm font-mono">{formatCurrency(comm.totalCommission)}</span>
+      <div className="pt-3 border-t border-border/25 grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div>
+          <span className="block text-muted-foreground text-[10px] uppercase tracking-wide">Valor sem impostos</span>
+          <span className="font-semibold text-foreground text-sm font-mono">{formatCurrency(comm.totalCommissionBeforeTax)}</span>
+        </div>
+        <div>
+          <span className="block text-muted-foreground text-[10px] uppercase tracking-wide">Impostos ({(comm.taxRate * 100).toFixed(0)}%)</span>
+          <span className="font-semibold text-destructive text-sm font-mono">− {formatCurrency(comm.taxAmount)}</span>
+        </div>
+        <div className="sm:text-right">
+          <span className="block text-muted-foreground text-[10px] uppercase tracking-wide">Valor pós impostos</span>
+          <span className="font-bold text-primary text-sm font-mono">{formatCurrency(comm.totalCommission)}</span>
+        </div>
       </div>
     </div>
   );
@@ -125,11 +146,11 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
               <TableHead className="px-3 py-3 text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase w-[96px]">Operação</TableHead>
               <TableHead className="px-3 py-3 text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase text-right w-[110px]">Mensal</TableHead>
               <TableHead className="px-3 py-3 text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase text-right w-[110px]">Implant.</TableHead>
-              <TableHead className="px-3 py-3 text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase text-right w-[120px]">Comissão</TableHead>
+              <TableHead className="px-3 py-3 text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase text-right w-[145px]">Comissão pós impostos</TableHead>
               {isDirector ? (
                 <>
                   <TableHead className="px-3 py-3 text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase text-right w-[120px]">Status Pag.</TableHead>
-                  <TableHead className="px-3 py-3 text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase text-right w-[130px]">Comissão</TableHead>
+                  <TableHead className="px-3 py-3 text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase text-right w-[130px]">Status comissão</TableHead>
                 </>
               ) : (
                 <TableHead className="px-3 py-3 text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase text-right w-[130px]">Status</TableHead>
@@ -174,6 +195,9 @@ export function DealsTable({ deals, presentations, settings, superMetaActive, on
                     <TableCell className="px-3 py-3.5 text-right">
                       <span className="text-sm font-bold font-mono text-primary">
                         {formatCurrency(comm.totalCommission)}
+                      </span>
+                      <span className="block text-[10px] text-muted-foreground/60 mt-0.5">
+                        Valor sem impostos: {formatCurrency(comm.totalCommissionBeforeTax)}
                       </span>
                       {comm.superMetaBonus > 0 && (
                         <span className="flex items-center justify-end gap-0.5 text-[10px] text-warning font-semibold mt-0.5">

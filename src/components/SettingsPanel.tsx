@@ -143,6 +143,7 @@ export function SettingsPanel({ settings, onSave, onUpdate, onRefreshDeals, read
             <li>• Implantação: comissão sobre <strong className="text-foreground">40%</strong> do valor.</li>
             <li>• Regra do dia 07: primeiro pagamento após o dia 07 entra financeiramente no mês seguinte.</li>
             <li>• Super meta: com 30 apresentações, a comissão de mensalidade dobra.</li>
+            <li>• Impostos: desconto fixo de <strong className="text-foreground">20%</strong> sobre a comissão de BluePex e Opus Tech; os pagamentos exibem o valor pós impostos.</li>
           </ul>
         </div>
 

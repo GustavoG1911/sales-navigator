@@ -87,10 +87,10 @@ function makeDeal(
   commissionRate: number
 ): SeedDeal {
   const implPayment = addDays(closingDate, 30);
-  // Commission snapshot: monthly * commRate + implantation * 40% * commRate
+  // Commission snapshot: gross commission minus the fixed 20% tax discount.
   // Note: base rate (70% vs 100%) not applied here since it depends on presentations at time of calc
   const commSnapshot = Math.round(
-    (monthlyValue * commissionRate + implantationValue * 0.4 * commissionRate) * 100
+    (monthlyValue * commissionRate + implantationValue * 0.4 * commissionRate) * 0.8 * 100
   ) / 100;
 
   return {

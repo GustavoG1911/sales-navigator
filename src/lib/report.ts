@@ -34,10 +34,14 @@ export function generateReportHTML(data: ReportData): string {
   const commissionDueDay = settings.commissionDueDay || 20;
 
   let totalProjected = 0;
+  let totalProjectedBeforeTax = 0;
+  let totalTax = 0;
   let totalPaid = 0;
+  let totalPaidBeforeTax = 0;
   let totalMonthly = 0;
   let totalImplantation = 0;
   let totalSuperBonus = 0;
+  let totalSuperBonusBeforeTax = 0;
   let bluePexVolume = 0;
   let opusTechVolume = 0;
 
@@ -47,15 +51,20 @@ export function generateReportHTML(data: ReportData): string {
     const dealSuperMeta = superMeta[dealMonthKey] || false;
     const comm = calculateCommission(deal, presCount, settings, dealSuperMeta);
     totalProjected += comm.totalCommission;
-    if (deal.paymentStatus === "Pago") totalPaid += comm.totalCommission;
+    totalProjectedBeforeTax += comm.totalCommissionBeforeTax;
+    totalTax += comm.taxAmount;
+    if (deal.paymentStatus === "Pago") {
+      totalPaid += comm.totalCommission;
+      totalPaidBeforeTax += comm.totalCommissionBeforeTax;
+    }
     totalMonthly += deal.monthlyValue;
     totalImplantation += deal.implantationValue;
     totalSuperBonus += comm.superMetaBonus;
+    totalSuperBonusBeforeTax += comm.superMetaBonusBeforeTax;
     const vol = deal.monthlyValue + deal.implantationValue;
     if (deal.operation === "BluePex") bluePexVolume += vol;
     else opusTechVolume += vol;
 
-    const basePercent = comm.monthlyBaseRate === 1 ? "100%" : "70%";
     const operationLabel = escapeHtml(deal.operation);
     const statusLabel = escapeHtml(deal.paymentStatus);
     const statusClass = safeClassToken(deal.paymentStatus);
@@ -67,18 +76,17 @@ export function generateReportHTML(data: ReportData): string {
         <td><span class="badge ${deal.operation === "BluePex" ? "badge-blue" : "badge-purple"}">${operationLabel}</span></td>
         <td class="num">${formatCurrency(deal.monthlyValue)}</td>
         <td class="num">${formatCurrency(deal.implantationValue)}</td>
-        <td class="num">${formatCurrency(comm.monthlyCommission)}</td>
-        <td class="num">${formatCurrency(comm.implantationCommission)}</td>
-        ${comm.superMetaBonus > 0 ? `<td class="num bold" style="color:#eab308">${formatCurrency(comm.superMetaBonus)}</td>` : `<td class="num">—</td>`}
+        <td class="num">${formatCurrency(comm.totalCommissionBeforeTax)}</td>
+        <td class="num" style="color:#b91c1c">− ${formatCurrency(comm.taxAmount)}</td>
         <td class="num bold">${formatCurrency(comm.totalCommission)}</td>
         <td><span class="status status-${statusClass}">${statusLabel}</span></td>
       </tr>
       <tr class="detail-row">
-        <td colspan="10" style="padding:4px 10px 8px 10px;background:#f8fafa;font-size:11px;color:#64748b;">
-          <strong>Mensalidade:</strong> ${formatCurrency(deal.monthlyValue)} × ${basePercent} × ${rate}% = ${formatCurrency(comm.monthlyCommission)}
+        <td colspan="9" style="padding:4px 10px 8px 10px;background:#f8fafa;font-size:11px;color:#64748b;">
+          <strong>Mensalidade:</strong> Valor sem impostos ${formatCurrency(comm.monthlyCommissionBeforeTax)} → Valor pós impostos ${formatCurrency(comm.monthlyCommission)}
           &nbsp;|&nbsp;
-          <strong>Implantação:</strong> ${formatCurrency(deal.implantationValue)} × 40% × ${rate}% = ${formatCurrency(comm.implantationCommission)}
-          ${comm.superMetaBonus > 0 ? `&nbsp;|&nbsp;<strong style="color:#eab308">⚡ Super Meta:</strong> ${formatCurrency(comm.superMetaBonus)}` : ""}
+          <strong>Implantação:</strong> Valor sem impostos ${formatCurrency(comm.implantationCommissionBeforeTax)} → Valor pós impostos ${formatCurrency(comm.implantationCommission)}
+          ${comm.superMetaBonus > 0 ? `&nbsp;|&nbsp;<strong style="color:#eab308">Super Meta:</strong> Valor sem impostos ${formatCurrency(comm.superMetaBonusBeforeTax)} → Valor pós impostos ${formatCurrency(comm.superMetaBonus)}` : ""}
         </td>
       </tr>`;
   });
@@ -101,6 +109,8 @@ export function generateReportHTML(data: ReportData): string {
   .kpi.highlight .kpi-label { color: rgba(255,255,255,0.8); }
   .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-bottom: 4px; }
   .kpi-value { font-size: 22px; font-weight: 700; font-family: 'Courier New', monospace; }
+  .kpi-note { font-size: 10px; color: #64748b; margin-top: 4px; }
+  .kpi.highlight .kpi-note { color: rgba(255,255,255,0.75); }
   .section { margin-bottom: 28px; }
   .section h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #334155; border-left: 3px solid #0d9488; padding-left: 10px; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -146,15 +156,17 @@ export function generateReportHTML(data: ReportData): string {
       <div class="kpi-value">${formatCurrency(salary)}</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Comissão Projetada</div>
+      <div class="kpi-label">Comissão Projetada — Valor pós impostos</div>
       <div class="kpi-value">${formatCurrency(totalProjected)}</div>
+      <div class="kpi-note">Valor sem impostos: ${formatCurrency(totalProjectedBeforeTax)}</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Comissão Paga</div>
+      <div class="kpi-label">Comissão Paga — Valor pós impostos</div>
       <div class="kpi-value">${formatCurrency(totalPaid)}</div>
+      <div class="kpi-note">Valor sem impostos: ${formatCurrency(totalPaidBeforeTax)}</div>
     </div>
     <div class="kpi highlight">
-      <div class="kpi-label">Total Geral</div>
+      <div class="kpi-label">Total Geral — Valor pós impostos</div>
       <div class="kpi-value">${formatCurrency(salary + totalPaid)}</div>
     </div>
   </div>
@@ -169,7 +181,7 @@ export function generateReportHTML(data: ReportData): string {
       <div>
         <div class="summary-item"><span class="label">Total Mensalidades</span><span class="val">${formatCurrency(totalMonthly)}</span></div>
         <div class="summary-item"><span class="label">Total Implantações</span><span class="val">${formatCurrency(totalImplantation)}</span></div>
-        ${totalSuperBonus > 0 ? `<div class="summary-item"><span class="label" style="color:#eab308">⚡ Bônus Super Meta</span><span class="val" style="color:#eab308">${formatCurrency(totalSuperBonus)}</span></div>` : ""}
+        ${totalSuperBonus > 0 ? `<div class="summary-item"><span class="label" style="color:#eab308">Bônus Super Meta — valor pós impostos</span><span class="val" style="color:#eab308">${formatCurrency(totalSuperBonus)} <small>(sem impostos: ${formatCurrency(totalSuperBonusBeforeTax)})</small></span></div>` : ""}
       </div>
     </div>
   </div>
@@ -181,8 +193,8 @@ export function generateReportHTML(data: ReportData): string {
         <tr>
           <th>Data</th><th>Cliente</th><th>Operação</th>
           <th class="num">Mensalidade</th><th class="num">Implantação</th>
-          <th class="num">Com. Mens.</th><th class="num">Com. Impl.</th>
-          <th class="num">Super Meta</th><th class="num">Comissão Total</th><th>Status</th>
+          <th class="num">Valor sem impostos</th><th class="num">Impostos (20%)</th>
+          <th class="num">Valor pós impostos</th><th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -191,7 +203,8 @@ export function generateReportHTML(data: ReportData): string {
           <td colspan="3">TOTAIS</td>
           <td class="num">${formatCurrency(totalMonthly)}</td>
           <td class="num">${formatCurrency(totalImplantation)}</td>
-          <td class="num" colspan="3"></td>
+          <td class="num">${formatCurrency(totalProjectedBeforeTax)}</td>
+          <td class="num" style="color:#b91c1c">− ${formatCurrency(totalTax)}</td>
           <td class="num bold">${formatCurrency(totalProjected)}</td>
           <td></td>
         </tr>
@@ -205,6 +218,7 @@ export function generateReportHTML(data: ReportData): string {
     <div class="rules">
       <p><strong>Comissão sobre Mensalidade:</strong> Base 100% (≥ 15 apres.) ou 70% (&lt; 15 apres.) × ${rate}% — verificada por operação no mês de fechamento</p>
       <p style="margin-top:6px"><strong>Comissão sobre Implantação:</strong> 40% do valor × ${rate}% (independente de apresentações)</p>
+      <p style="margin-top:6px"><strong>Impostos:</strong> desconto fixo de 20% sobre toda comissão de BluePex e Opus Tech. Valor sem impostos é o bruto calculado; valor pós impostos é o líquido pago.</p>
       <p style="margin-top:6px"><strong>Pagamento:</strong> Comissões pagas até o dia ${commissionDueDay} do mês subsequente ao fechamento</p>
       <p style="margin-top:6px"><strong>Metas por Operação:</strong> BluePex e Opus Tech possuem contadores de apresentações separados</p>
     </div>
